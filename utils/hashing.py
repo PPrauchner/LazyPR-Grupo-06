@@ -34,8 +34,7 @@ from core.models.pr_record import PRRecord
 
 
 def hash_content(text: str) -> str:
-    """
-    Gera chave SHA-256 de uma string de conteúdo.
+    """Gera chave SHA-256 de uma string de conteúdo.
 
     Args:
         text: Conteúdo a hashear (ex: corpo de PR, descrição).
@@ -47,9 +46,10 @@ def hash_content(text: str) -> str:
 
 
 def hash_file_stream(stream: IO[str]) -> Tuple[str, Generator[str, None, None]]:
-    """
-    Calcula hash SHA-256 de arquivo em streaming, retornando
-    digest + gerador de linhas para consumo lazy.
+    """Calcula hash SHA-256 de arquivo em streaming.
+
+    Lê arquivo linha a linha, calcula hash SHA-256,
+    e retorna digest + gerador para consumo lazy.
 
     Args:
         stream: File object aberto em modo texto.
@@ -61,25 +61,18 @@ def hash_file_stream(stream: IO[str]) -> Tuple[str, Generator[str, None, None]]:
     sha256 = hashlib.sha256()
     lines = []
 
-    def line_generator() -> Generator[str, None, None]:
-        """Gerador que rehidrata as linhas já lidas."""
-        yield from lines
-
-    # Lê e hash toda o arquivo, armazenando linhas para gerador
     for line in stream:
         sha256.update(line.encode("utf-8"))
         lines.append(line)
 
     digest = sha256.hexdigest()
-    return digest, line_generator()
+    return digest, (line for line in lines)
 
 
 def hash_record(pr_record: PRRecord) -> str:
-    """
-    Gera chave SHA-256 única de um PRRecord baseada em
-    repository (identificador canônico de um repositório).
+    """Gera chave SHA-256 única de um PRRecord.
 
-    O hash de um PR é determinado unicamente pelo repositório,
+    Identifica unicamente um repositório usando apenas o campo 'repo',
     permitindo cache compartilhado de análises por repo.
 
     Args:
@@ -88,7 +81,4 @@ def hash_record(pr_record: PRRecord) -> str:
     Returns:
         Hex digest SHA-256 que identifica o repositório de forma única.
     """
-    # Usa apenas 'repository' como chave única do repo
-    # (todos os PRs do mesmo repo geram o mesmo hash)
-    content = pr_record.repository
-    return hash_content(content)
+    return hash_content(pr_record.repo)

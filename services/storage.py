@@ -32,19 +32,16 @@ Relacionado a:
 
 import json
 import os
-from dataclasses import asdict
 from pathlib import Path
-from typing import Generator, Iterable
+from typing import Generator
 
 from core.models.analysis_result import AnalysisResult
 
 
 def _get_cache_dir() -> Path:
-    """
-    Obtém o diretório de cache configurável.
+    """Obtém o diretório de cache configurável.
 
-    Lê CACHE_DIR do ambiente (.env ou variável de sistema).
-    Padrão: ".cache" na raiz do projeto.
+    Lê variável de ambiente CACHE_DIR, com fallback para ".cache".
 
     Returns:
         Caminho do diretório de cache como Path.
@@ -54,8 +51,7 @@ def _get_cache_dir() -> Path:
 
 
 def has_cached_analysis(repo_hash: str) -> bool:
-    """
-    Verifica se análise já foi persistida para um repositório.
+    """Verifica se análise já foi persistida para um repositório.
 
     Args:
         repo_hash: Hash SHA-256 único do repositório.
@@ -68,17 +64,16 @@ def has_cached_analysis(repo_hash: str) -> bool:
 
 
 def load_results(repo_hash: str) -> Generator[AnalysisResult, None, None]:
-    """
-    Carrega análises persistidas de um repositório do cache.
+    """Carrega análises persistidas de um repositório do cache.
+
+    Lê arquivo JSON e reconstitui AnalysisResult.
+    Em caso de arquivo inválido ou inexistente, retorna gerador vazio.
 
     Args:
         repo_hash: Hash SHA-256 único do repositório.
 
     Yields:
         AnalysisResult reconstituído do arquivo JSON.
-
-    Raises:
-        FileNotFoundError: Se arquivo de cache não existe (esperado para miss).
     """
     cache_path = _get_cache_dir() / f"{repo_hash}.json"
 
@@ -89,27 +84,22 @@ def load_results(repo_hash: str) -> Generator[AnalysisResult, None, None]:
         with open(cache_path, "r", encoding="utf-8") as f:
             data = json.load(f)
 
-        # Espera lista de dicts (um por AnalysisResult)
         if isinstance(data, list):
             for item in data:
-                # Reconstrói AnalysisResult a partir do dict serializado
                 yield AnalysisResult(**item)
     except (json.JSONDecodeError, KeyError, TypeError):
-        # Arquivo corrompido ou inválido — retorna gerador vazio
         return
 
 
-def save_results(repo_hash: str, results: Iterable[AnalysisResult]) -> None:
-    """
-    Salva análises em arquivo JSON local com escrita atômica.
+def save_results(repo_hash: str, results: list[AnalysisResult]) -> None:
+    """Salva análises em arquivo JSON com escrita atômica.
 
-    Materializa resultados em lista, serializa para JSON,
-    e escreve para arquivo temporário antes de renomear
-    (atomic write pattern).
+    Escreve para arquivo temporário e renomeia atomicamente
+    para evitar corrupção em caso de interrupção.
 
     Args:
         repo_hash: Hash SHA-256 único do repositório.
-        results: Iterável de AnalysisResult a persistir.
+        results: Lista de AnalysisResult a persistir.
     """
     cache_dir = _get_cache_dir()
     cache_dir.mkdir(parents=True, exist_ok=True)
@@ -117,15 +107,9 @@ def save_results(repo_hash: str, results: Iterable[AnalysisResult]) -> None:
     cache_path = cache_dir / f"{repo_hash}.json"
     temp_path = cache_dir / f"{repo_hash}.tmp.json"
 
-    # Materializa resultados em lista
-    results_list = list(results)
+    serialized = [result._asdict() for result in results]
 
-    # Serializa para JSON
-    serialized = [asdict(result) for result in results_list]
-
-    # Escreve para arquivo temporário
     with open(temp_path, "w", encoding="utf-8") as f:
         json.dump(serialized, f, ensure_ascii=False, indent=2)
 
-    # Rename atômico (substitui arquivo antigo se existe)
     os.replace(temp_path, cache_path)

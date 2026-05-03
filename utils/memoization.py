@@ -46,7 +46,11 @@ _stats_lock = threading.Lock()
 
 
 def _update_stats(hit: bool) -> None:
-    """Atualiza contadores de cache hit/miss (thread-safe)."""
+    """Atualiza contadores de cache hit/miss (thread-safe).
+
+    Args:
+        hit: True se foi cache hit, False se miss.
+    """
     with _stats_lock:
         if hit:
             _cache_stats["hits"] += 1
@@ -55,75 +59,58 @@ def _update_stats(hit: bool) -> None:
 
 
 def cached_classify(
-    classify_fn: Callable[..., Generator[Any, None, None]], content_hash: str
+    classify_fn: Callable[[], Generator[Any, None, None]], content_hash: str
 ) -> Generator[Any, None, None]:
-    """
-    Memoização em dois níveis para classificações LLM:
-    1. Cache em memória (L1) — para reutilização dentro da mesma sessão
-    2. Cache em disco (L2) — para reutilização entre sessões
+    """Memoização em dois níveis (memória + disco) para classificações LLM.
 
-    Fluxo:
-    - Se content_hash está em memória → retorna valor (HIT L1)
-    - Elif arquivo de cache existe em disco → carrega (HIT L2)
-    - Else → chama classify_fn (MISS) e persiste resultado
+    Fluxo de lookup:
+    1. Cache em memória (L1) → retorna resultado
+    2. Cache em disco via storage.py (L2) → carrega e retorna
+    3. Cache miss → chama classify_fn, persiste, retorna
 
     Args:
-        classify_fn: Função real de classificação que retorna
-                     gerador de resultados.
+        classify_fn: Função de classificação que retorna gerador.
         content_hash: Hash SHA-256 do repositório (chave de cache).
 
     Yields:
-        Resultado de classificação (em memória ou do LLM).
+        Resultado de classificação (em memória, disco ou LLM).
     """
-    # Lookup L1 (memória)
     with _cache_lock:
         if content_hash in _in_memory_cache:
             _update_stats(hit=True)
-            # Faz yield from para produzir itens individuais
             yield from _in_memory_cache[content_hash]
             return
 
-    # Lookup L2 (disco)
     if has_cached_analysis(content_hash):
         _update_stats(hit=True)
-        # Carrega e materializa resultados
         cached_results = list(load_results(content_hash))
-        # Armazena em memória para próximas chamadas
         with _cache_lock:
             _in_memory_cache[content_hash] = cached_results
-        # Faz yield from para produzir itens individuais
         yield from cached_results
         return
 
-    # Miss — chama função real e materializa resultado
     _update_stats(hit=False)
-    results = list(classify_fn())  # Materializa gerador
+    results = list(classify_fn())
 
-    # Armazena em memória
     with _cache_lock:
         _in_memory_cache[content_hash] = results
 
-    # Persiste em disco (async seria ideal, mas mantém síncrono por segurança)
     save_results(content_hash, results)
-
-    # Faz yield from para produzir itens individuais
     yield from results
 
 
 def clear_cache() -> None:
-    """
-    Limpa todo o cache em memória.
+    """Limpa todo o cache em memória.
 
+    Nota: Não afeta arquivos persistidos em disco.
     Útil para "reset cache" na interface ou entre testes.
-    Não afeta arquivos persistidos em disco.
     """
     with _cache_lock:
         _in_memory_cache.clear()
 
 
 def get_cache_stats() -> Dict[str, int]:
-    """
-    Retorna estatísticas de cache (hits, misses, total).
+    """Retorna estatísticas de cache (hits, misses, total).
 
     Returns:
         Dict com chaves 'hits', 'misses', 'total'.

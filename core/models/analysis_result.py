@@ -28,18 +28,50 @@ Relacionado a:
     - Regra Funcional 03 (imutabilidade de dados)
 """
 
-from dataclasses import dataclass
-from typing import Optional
-
-from core.models.pr_record import PRRecord
+from typing import NamedTuple
 
 
-@dataclass(frozen=True)
-class AnalysisResult(PRRecord):
-    """Resultado da análise de um PR após enriquecimento semântico."""
+class AnalysisResult(NamedTuple):
+    """Resultado da análise semântica de um PR.
 
-    project_type: Optional[str] = None
-    pr_nature: Optional[str] = None
-    clarity_level: Optional[str] = None
-    char_count: int = 0
-    word_count: int = 0
+    Estende PRRecord com classificações obrigatórias do LLM,
+    representando um PR após enriquecimento com tipos de projeto,
+    natureza da contribuição e clareza da descrição.
+
+    Attributes:
+        id: Identificador único do comentário.
+        html_url: URL completa do comentário no GitHub.
+        repo: Repositório no formato "owner/repo".
+        path: Arquivo comentado.
+        body: Texto completo do comentário.
+        diff_hunk: Trecho do diff associado.
+        author: Login do autor.
+        author_association: Relação com repositório.
+        commit_id: ID do commit.
+        line: Número da linha.
+        language: Linguagem do arquivo.
+        created_at: Data de criação.
+        project_type: Tipo de projeto ("library"|"web_app"|"framework"|"cli"|"other").
+        pr_nature: Natureza da contribuição ("bug_fix"|"feature"|"refactoring"|"documentation"|"other").
+        clarity_level: Clareza da descrição ("insufficient"|"basic"|"good"|"excellent").
+        char_count: Contagem de caracteres do body.
+        word_count: Contagem de palavras do body.
+    """
+
+    id: int
+    html_url: str
+    repo: str
+    path: str
+    body: str
+    diff_hunk: str
+    author: str
+    author_association: str
+    commit_id: str
+    line: int
+    language: str | None
+    created_at: str | None
+    project_type: str
+    pr_nature: str
+    clarity_level: str
+    char_count: int
+    word_count: int

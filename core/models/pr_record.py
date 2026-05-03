@@ -24,17 +24,39 @@ Relacionado a:
     - Regra Funcional 03 (imutabilidade de dados)
 """
 
-from dataclasses import dataclass
+from typing import NamedTuple
 
 
-@dataclass(frozen=True)
-class PRRecord:
-    """Registro imutável de um pull request bruto do dataset."""
+class PRRecord(NamedTuple):
+    """Registro imutável de um PR bruto do dataset Kaggle.
 
-    id: str
-    repository: str
-    title: str
+    Representa um comentário de pull request com todos os campos
+    originais do dataset antes de enriquecimento semântico.
+
+    Attributes:
+        id: Identificador único do comentário.
+        html_url: URL completa do comentário no GitHub.
+        repo: Repositório no formato "owner/repo".
+        path: Arquivo comentado (ex: "src/main.py").
+        body: Texto completo do comentário.
+        diff_hunk: Trecho do diff associado.
+        author: Login do autor do comentário.
+        author_association: Relação com repo ("OWNER", "MEMBER", "CONTRIBUTOR", etc).
+        commit_id: ID do commit referenciado.
+        line: Número da linha comentada.
+        language: Linguagem principal do arquivo (None se indeterminada).
+        created_at: Data de criação no ISO format (None se ausente).
+    """
+
+    id: int
+    html_url: str
+    repo: str
+    path: str
     body: str
+    diff_hunk: str
     author: str
+    author_association: str
+    commit_id: str
+    line: int
     language: str | None = None
     created_at: str | None = None
