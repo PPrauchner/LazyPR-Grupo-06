@@ -27,3 +27,19 @@ Relacionado a:
     - Regra Geral 07 (estruturas imutáveis)
     - Regra Funcional 03 (imutabilidade de dados)
 """
+
+from dataclasses import dataclass
+from typing import Optional
+
+from core.models.pr_record import PRRecord
+
+
+@dataclass(frozen=True)
+class AnalysisResult(PRRecord):
+    """Resultado da análise de um PR após enriquecimento semântico."""
+
+    project_type: Optional[str] = None
+    pr_nature: Optional[str] = None
+    clarity_level: Optional[str] = None
+    char_count: int = 0
+    word_count: int = 0

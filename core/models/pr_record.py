@@ -23,3 +23,18 @@ Relacionado a:
     - Regra Geral 07 (estruturas imutáveis)
     - Regra Funcional 03 (imutabilidade de dados)
 """
+
+from dataclasses import dataclass
+
+
+@dataclass(frozen=True)
+class PRRecord:
+    """Registro imutável de um pull request bruto do dataset."""
+
+    id: str
+    repository: str
+    title: str
+    body: str
+    author: str
+    language: str | None = None
+    created_at: str | None = None
