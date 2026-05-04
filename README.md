@@ -71,7 +71,7 @@ O projeto segue o padrão **Functional Core / Imperative Shell**:
 │  Imperative Shell   │      │   Imperative Shell      │
 │  services/ingestion │      │ services/classifiers    │
 │  services/storage   │      │ services/llm_client     │
-│  services/exporters │      │ utils/memorization       │
+│  services/exporters │      │ utils/memoization       │
 └─────────────────────┘      └─────────────────────────┘
          I/O de arquivo              Chamadas LLM
 ```
@@ -139,7 +139,7 @@ LAZYPR-GRUPO-06/
 │   └── test_hashing.py
 │
 ├── utils/                         # Helpers genéricos
-│   ├── memorization.py             # Decorador memoize() + cached_classify()
+│   ├── memoization.py             # Decorador memoize() + cached_classify()
 │   └── hashing.py                 # hash_content(), hash_file_stream(), hash_record()
 │
 ├── main.py                        # Ponto de entrada — configuração e init do Streamlit
@@ -203,7 +203,7 @@ LAZYPR-GRUPO-06/
 
 | Módulo | Responsabilidade |
 |---|---|
-| `memorization.py` | `memoize(fn)` como decorador; `cached_classify()` com lookup por hash; integra com `storage.py` para persistência cross-sessão |
+| `memoization.py` | `memoize(fn)` como decorador; `cached_classify()` com lookup por hash; integra com `storage.py` para persistência cross-sessão |
 | `hashing.py` | `hash_content(text)`, `hash_file_stream(stream)`, `hash_record(pr_record)` — SHA-256 determinístico para cache |
 
 ---
