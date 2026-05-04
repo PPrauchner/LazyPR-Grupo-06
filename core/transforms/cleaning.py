@@ -32,6 +32,7 @@ Relacionado a:
 import re
 import unicodedata
 from dataclasses import dataclass
+from datetime import date
 
 # Constantes
 
@@ -49,6 +50,11 @@ class PRRecord:
     title: str | None
     body: str | None
     author: str | None
+    language: str | None
+    project_type: str | None
+    contribution_nature: str | None
+    clarity_level: int | None
+    created_at: date | None
 
 
 @dataclass(frozen=True)
@@ -58,6 +64,11 @@ class CleanPRRecord:
     title: str
     body: str
     author: str
+    language: str
+    project_type: str
+    contribution_nature: str
+    clarity_level: int
+    created_at: date
 
 
 def strip_whitespace(text: str) -> str:
@@ -197,4 +208,9 @@ def clean_pr_record(record: PRRecord) -> CleanPRRecord:
         title=clean_title(record.title),
         body=clean_body(record.body),
         author=clean_author(record.author),
+        language=replace_null(record.language, "unknown"),
+        project_type=replace_null(record.project_type, "unknown"),
+        contribution_nature=replace_null(record.contribution_nature, "unknown"),
+        clarity_level=record.clarity_level if record.clarity_level is not None else 0,
+        created_at=record.created_at if record.created_at is not None else date.min,
     )
