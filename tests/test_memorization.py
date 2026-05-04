@@ -11,15 +11,15 @@ import pytest
 
 from core.models.analysis_result import AnalysisResult
 from core.models.pr_record import PRRecord
-from utils import memoization
+from utils import memorization
 
 
 @pytest.fixture
 def reset_cache(monkeypatch):
     """Reseta cache em memória e stats antes de cada teste."""
-    memoization._in_memory_cache.clear()
-    memoization._cache_stats["hits"] = 0
-    memoization._cache_stats["misses"] = 0
+    memorization._in_memory_cache.clear()
+    memorization._cache_stats["hits"] = 0
+    memorization._cache_stats["misses"] = 0
     yield
 
 
@@ -70,12 +70,12 @@ class TestCachedClassify:
             yield result
 
         # Primeira chamada → miss (chama mock_classify)
-        result1 = list(memoization.cached_classify(mock_classify, test_hash))
+        result1 = list(memorization.cached_classify(mock_classify, test_hash))
         assert call_count == 1
         assert len(result1) > 0
 
         # Segunda chamada → hit (não chama mock_classify)
-        result2 = list(memoization.cached_classify(mock_classify, test_hash))
+        result2 = list(memorization.cached_classify(mock_classify, test_hash))
         assert call_count == 1  # Não incrementou
         assert result1 == result2
 
@@ -105,14 +105,14 @@ class TestCachedClassify:
             yield result
 
         # Primeira chamada (miss)
-        list(memoization.cached_classify(mock_classify, "hash1"))
-        stats = memoization.get_cache_stats()
+        list(memorization.cached_classify(mock_classify, "hash1"))
+        stats = memorization.get_cache_stats()
         assert stats["misses"] == 1
         assert stats["hits"] == 0
 
         # Segunda chamada (hit)
-        list(memoization.cached_classify(mock_classify, "hash1"))
-        stats = memoization.get_cache_stats()
+        list(memorization.cached_classify(mock_classify, "hash1"))
+        stats = memorization.get_cache_stats()
         assert stats["misses"] == 1
         assert stats["hits"] == 1
         assert stats["total"] == 2
@@ -146,8 +146,8 @@ class TestCachedClassify:
             yield result
 
         # Chamadas com hashes diferentes → ambas chamam mock_classify
-        list(memoization.cached_classify(mock_classify, "hash_a"))
-        list(memoization.cached_classify(mock_classify, "hash_b"))
+        list(memorization.cached_classify(mock_classify, "hash_a"))
+        list(memorization.cached_classify(mock_classify, "hash_b"))
 
         assert call_count == 2
 
@@ -179,12 +179,12 @@ class TestCachedClassify:
         hash_key = "persist_test"
 
         # Primeira chamada — cached_classify yields itens individuais
-        results1 = list(memoization.cached_classify(mock_classify, hash_key))
+        results1 = list(memorization.cached_classify(mock_classify, hash_key))
         assert len(results1) > 0
         result1 = results1[0]
 
         # Segunda chamada sem limpar cache
-        results2 = list(memoization.cached_classify(mock_classify, hash_key))
+        results2 = list(memorization.cached_classify(mock_classify, hash_key))
         assert len(results2) > 0
         result2 = results2[0]
 
@@ -230,15 +230,15 @@ class TestClearCache:
             yield from mock_classify()
 
         # Primeira chamada
-        list(memoization.cached_classify(counting_classify, hash_key))
+        list(memorization.cached_classify(counting_classify, hash_key))
         assert call_count == 1
 
         # Clear cache apenas em memória
-        memoization.clear_cache()
+        memorization.clear_cache()
 
         # Segunda chamada após clear vai ao storage (ainda chamará se arquivo não existe)
         # Mas para este teste, vamos verificar que segunda chamada com hash diferente chama novamente
-        list(memoization.cached_classify(counting_classify, hash_key + "_different"))
+        list(memorization.cached_classify(counting_classify, hash_key + "_different"))
         assert call_count == 2
 
 
@@ -247,7 +247,7 @@ class TestGetCacheStats:
 
     def test_cache_stats_initial(self, reset_cache, temp_cache_dir):
         """Stats iniciam zeradas."""
-        stats = memoization.get_cache_stats()
+        stats = memorization.get_cache_stats()
         assert stats["hits"] == 0
         assert stats["misses"] == 0
         assert stats["total"] == 0
@@ -279,13 +279,13 @@ class TestGetCacheStats:
 
         # 3 misses
         for i in range(3):
-            list(memoization.cached_classify(mock_classify, f"hash_{i}"))
+            list(memorization.cached_classify(mock_classify, f"hash_{i}"))
 
         # 2 hits (repetindo hashes anteriores)
-        list(memoization.cached_classify(mock_classify, "hash_0"))
-        list(memoization.cached_classify(mock_classify, "hash_1"))
+        list(memorization.cached_classify(mock_classify, "hash_0"))
+        list(memorization.cached_classify(mock_classify, "hash_1"))
 
-        stats = memoization.get_cache_stats()
+        stats = memorization.get_cache_stats()
         assert stats["misses"] == 3
         assert stats["hits"] == 2
         assert stats["total"] == 5

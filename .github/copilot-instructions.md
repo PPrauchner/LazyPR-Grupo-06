@@ -36,9 +36,9 @@
 - Toda função dentro de `core/` deve ser pura: mesma entrada → mesma saída, sem I/O, sem estado global, sem efeitos colaterais.
 - Funções impuras (I/O, rede, LLM, Streamlit) vivem **exclusivamente** em `services/` e `ui/`.
 
-### Memoização
+### Memorização
 - Use `functools.lru_cache` para funções puras chamadas repetidamente com mesmas entradas.
-- Para classificações LLM, use `utils/memoization.py` com chave SHA-256 do conteúdo via `utils/hashing.py`.
+- Para classificações LLM, use `utils/memorization.py` com chave SHA-256 do conteúdo via `utils/hashing.py`.
 - O cache deve ser persistido em disco via `services/storage.py` para sobreviver entre sessões.
 
 ---
@@ -141,7 +141,7 @@ LAZYPR-GRUPO-06/
 │
 ├── tests/                    # Testes unitários — foco nas funções puras de core/
 ├── utils/
-│   ├── memoization.py        # memoize() + cached_classify()
+│   ├── memorization.py        # memoize() + cached_classify()
 │   └── hashing.py            # hash_content(), hash_file_stream(), hash_record()
 │
 ├── main.py
