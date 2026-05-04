@@ -29,3 +29,23 @@ Relacionado a:
     - Issue 07 (gráfico de correlação multidimensional)
     - HU 05, 06, 07 (visualizações interativas)
 """
+
+import pandas as pd
+import plotly.express as px
+
+
+def bar_chart_by_category(data: dict, title: str):
+    """
+    Cria gráfico de barras a partir de dados agregados.
+    """
+
+    df = pd.DataFrame(
+        {"Categoria": list(data.keys()), "Quantidade": list(data.values())}
+    )
+
+    fig = px.bar(df, x="Categoria", y="Quantidade", title=title)
+
+    return fig
+
+
+# qualquer coisinha
