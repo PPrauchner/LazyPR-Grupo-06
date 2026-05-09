@@ -30,124 +30,99 @@ Relacionado a:
 """
 
 from collections.abc import Callable
-from datetime import date
 
-from core.transforms.cleaning import CleanPRRecord
+from core.models.analysis_result import AnalysisResult
 
-# Tipos
-
-Predicate = Callable[[CleanPRRecord], bool]
+Predicate = Callable[[AnalysisResult], bool]
 
 
-def by_language(languages: list[str]) -> Predicate:
+def by_language(languages: tuple[str, ...]) -> Predicate:
     """
-    Mantém registros cuja linguagem de programação esteja na lista.
+    Cria um predicado para filtrar registros por linguagem.
 
-    Comparação case-insensitive para evitar descartes por capitalização.
+    A comparação é case-insensitive para evitar descartes causados por
+    diferenças de capitalização, como "Python" e "python".
 
-    Exemplo:
-        filtro = by_language(["python", "typescript"])
-        filtro(record)  →  True se record.language in {"python", "typescript"}
+    Args:
+        languages: Linguagens selecionadas pelo usuário.
+
+    Returns:
+        Função que recebe um AnalysisResult e retorna True quando a linguagem
+        do registro estiver entre as linguagens permitidas.
     """
-    allowed = {lang.lower() for lang in languages}
-
-    def predicate(record: CleanPRRecord) -> bool:
-        return record.language.lower() in allowed
-
-    return predicate
+    allowed = frozenset(map(str.lower, languages))
+    return lambda record: record.language.lower() in allowed
 
 
-def by_project_type(types: list[str]) -> Predicate:
+def by_project_type(project_types: tuple[str, ...]) -> Predicate:
     """
-    Mantém registros cujo tipo de projeto esteja na lista.
+    Cria um predicado para filtrar registros por tipo de projeto.
 
-    Exemplo:
-        filtro = by_project_type(["library", "cli"])
-        filtro(record)  →  True se record.project_type in {"library", "cli"}
+    Os valores esperados devem seguir o vocabulário controlado do projeto,
+    como "library", "web_app", "framework", "cli" e "other".
+
+    Args:
+        project_types: Tipos de projeto selecionados pelo usuário.
+
+    Returns:
+        Função que recebe um AnalysisResult e retorna True quando o tipo de
+        projeto do registro estiver entre os valores permitidos.
     """
-    allowed = {t.lower() for t in types}
-
-    def predicate(record: CleanPRRecord) -> bool:
-        return record.project_type.lower() in allowed
-
-    return predicate
+    allowed = frozenset(map(str.lower, project_types))
+    return lambda record: record.project_type.lower() in allowed
 
 
-def by_contribution_nature(natures: list[str]) -> Predicate:
+def by_pr_nature(pr_natures: tuple[str, ...]) -> Predicate:
     """
-    Mantém registros cuja natureza de contribuição esteja na lista.
+    Cria um predicado para filtrar registros por natureza da contribuição.
 
-    Naturezas típicas: "bugfix", "feature", "refactor", "docs", "chore".
+    Os valores devem corresponder ao campo pr_nature definido em AnalysisResult,
+    como "bug_fix", "feature", "refactoring", "documentation" e "other".
 
-    Exemplo:
-        filtro = by_contribution_nature(["bugfix", "feature"])
-        filtro(record)  →  True se record.contribution_nature in {"bugfix", "feature"}
+    Args:
+        pr_natures: Naturezas de contribuição selecionadas pelo usuário.
+
+    Returns:
+        Função que recebe um AnalysisResult e retorna True quando a natureza
+        da contribuição estiver entre os valores permitidos.
     """
-    allowed = {n.lower() for n in natures}
-
-    def predicate(record: CleanPRRecord) -> bool:
-        return record.contribution_nature.lower() in allowed
-
-    return predicate
+    allowed = frozenset(map(str.lower, pr_natures))
+    return lambda record: record.pr_nature.lower() in allowed
 
 
-def by_clarity_level(min_clarity: int, max_clarity: int) -> Predicate:
+def by_clarity_level(clarity_levels: tuple[str, ...]) -> Predicate:
     """
-    Mantém registros cujo nível de clareza esteja dentro do intervalo [min, max].
+    Cria um predicado para filtrar registros por nível de clareza.
 
-    O nível de clareza é um inteiro (ex: 1–5), onde valores maiores
-    indicam descrições mais claras e completas.
+    O projeto define clarity_level como categoria textual, não como número.
+    Por isso, o filtro recebe um conjunto de labels válidas em vez de um
+    intervalo numérico.
 
-    Exemplo:
-        filtro = by_clarity_level(min_clarity=3, max_clarity=5)
-        filtro(record)  →  True se 3 ≤ record.clarity_level ≤ 5
+    Args:
+        clarity_levels: Níveis de clareza selecionados pelo usuário.
+
+    Returns:
+        Função que recebe um AnalysisResult e retorna True quando o nível de
+        clareza estiver entre os valores permitidos.
     """
-
-    def predicate(record: CleanPRRecord) -> bool:
-        return min_clarity <= record.clarity_level <= max_clarity
-
-    return predicate
-
-
-def by_date_range(start: date, end: date) -> Predicate:
-    """
-    Mantém registros cuja data de criação esteja dentro do intervalo [start, end].
-
-    Ambas as extremidades são inclusivas.
-
-    Exemplo:
-        filtro = by_date_range(date(2024, 1, 1), date(2024, 6, 30))
-        filtro(record)  →  True se 2024-01-01 ≤ record.created_at ≤ 2024-06-30
-    """
-
-    def predicate(record: CleanPRRecord) -> bool:
-        return start <= record.created_at <= end
-
-    return predicate
+    allowed = frozenset(map(str.lower, clarity_levels))
+    return lambda record: record.clarity_level.lower() in allowed
 
 
 def build_filter(*predicates: Predicate) -> Predicate:
     """
-    Compõe múltiplos predicados em uma única função de filtro via AND.
+    Compõe múltiplos predicados em uma única função de filtro.
 
-    Um registro só passa se TODOS os predicados retornarem True.
-    Se nenhum predicado for fornecido, todos os registros passam.
+    A composição usa conjunção lógica: um registro só passa se todos os
+    predicados ativos retornarem True. Quando nenhum predicado é informado,
+    all() retorna True, permitindo que todos os registros passem.
 
-    Projetado para integração com a sidebar do Streamlit: o chamador
-    monta a lista de predicados com base nas seleções do usuário e
-    chama build_filter uma vez — sem recarregar o dataset base.
+    Args:
+        *predicates: Predicados individuais criados a partir dos filtros
+            selecionados na interface.
 
-    Exemplo:
-        filtro = build_filter(
-            by_language(["python"]),
-            by_contribution_nature(["bugfix"]),
-            by_date_range(date(2024, 1, 1), date(2024, 12, 31)),
-        )
-
-        registros_filtrados = [r for r in registros if filtro(r)]
+    Returns:
+        Função que recebe um AnalysisResult e retorna True quando o registro
+        satisfizer todos os critérios ativos.
     """
-
-    def combined(record: CleanPRRecord) -> bool:
-        return all(predicate(record) for predicate in predicates)
-
-    return combined
+    return lambda record: all(predicate(record) for predicate in predicates)
