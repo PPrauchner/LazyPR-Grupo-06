@@ -31,186 +31,219 @@ Relacionado a:
 
 import re
 import unicodedata
-from dataclasses import dataclass
-from datetime import date
+from html import unescape
 
-# Constantes
+from core.models.pr_record import PRRecord
 
-MAX_BODY_LENGTH = 6_000  # limite seguro para contexto de LLM
-BODY_TRUNCATION_SUFFIX = "\n\n[corpo truncado]"
+MAX_BODY_LENGTH = 1_500
+MAX_DIFF_HUNK_LENGTH = 2_000
+
+BODY_TRUNCATION_SUFFIX = "\n\n[body truncated]"
+DIFF_TRUNCATION_SUFFIX = "\n\n[diff truncated]"
 
 EMPTY_STRING = ""
-UNKNOWN_TITLE = "[sem título]"
-
-
-@dataclass(frozen=True)
-class PRRecord:
-    """Representação imutável de um Pull Request bruto."""
-
-    title: str | None
-    body: str | None
-    author: str | None
-    language: str | None
-    project_type: str | None
-    contribution_nature: str | None
-    clarity_level: int | None
-    created_at: date | None
-
-
-@dataclass(frozen=True)
-class CleanPRRecord:
-    """PRRecord após limpeza — todos os campos são strings válidas."""
-
-    title: str
-    body: str
-    author: str
-    language: str
-    project_type: str
-    contribution_nature: str
-    clarity_level: int
-    created_at: date
 
 
 def strip_whitespace(text: str) -> str:
-    """Remove espaços em branco nas extremidades do texto."""
+    """
+    Remove espaços em branco das extremidades de um texto.
+
+    Args:
+        text: Texto de entrada já convertido para string válida.
+
+    Returns:
+        O mesmo texto sem espaços, quebras de linha ou tabulações nas
+        extremidades.
+    """
     return text.strip()
 
 
-def replace_null(value: str | None, fallback: str) -> str:
-    """Retorna o valor original ou o fallback se for None/vazio."""
-    if value is None:
-        return fallback
-    stripped = value.strip()
+def replace_null(value: str | None, fallback: str = EMPTY_STRING) -> str:
+    """
+    Substitui valores ausentes ou vazios por um fallback canônico.
+
+    Args:
+        value: Valor textual original, podendo ser None.
+        fallback: Valor usado quando value for None ou string vazia.
+
+    Returns:
+        O texto original sem espaços nas extremidades, ou fallback quando
+        não houver conteúdo textual útil.
+    """
+    stripped = value.strip() if value is not None else EMPTY_STRING
     return stripped if stripped else fallback
 
 
 def remove_control_characters(text: str) -> str:
     """
-    Remove caracteres de controle Unicode (categoria 'C'), exceto
-    quebras de linha (\n) e tabulações (\t), que têm valor semântico.
+    Remove caracteres de controle Unicode de um texto.
+
+    Quebras de linha e tabulações são preservadas porque podem carregar
+    significado em comentários, trechos de código e diff_hunks.
+
+    Args:
+        text: Texto de entrada.
+
+    Returns:
+        Texto sem caracteres de controle indesejados.
     """
-
-    def is_allowed(char: str) -> bool:
-        if char in ("\n", "\t"):
-            return True
-        return unicodedata.category(char) != "Cc"
-
-    return "".join(filter(is_allowed, text))
+    return "".join(
+        filter(
+            lambda char: char in ("\n", "\t") or unicodedata.category(char) != "Cc",
+            text,
+        )
+    )
 
 
 def remove_html_artifacts(text: str) -> str:
     """
-    Remove tags HTML e decodifica entidades HTML escapadas comuns
-    que aparecem como artefatos em corpos de PR.
+    Decodifica entidades HTML e remove tags HTML simples.
 
-    Exemplos:
-        "&lt;b&gt;texto&lt;/b&gt;" → "texto"
-        "&amp;"                   → "&"
+    Esta função trata artefatos comuns vindos de comentários exportados,
+    como &amp;, &lt;, &gt; e tags HTML embutidas.
+
+    Args:
+        text: Texto possivelmente contendo entidades ou tags HTML.
+
+    Returns:
+        Texto com entidades HTML decodificadas e tags removidas.
     """
-
-    html_entities = {
-        "&amp;": "&",
-        "&lt;": "<",
-        "&gt;": ">",
-        "&quot;": '"',
-        "&#39;": "'",
-        "&nbsp;": " ",
-    }
-    for entity, char in html_entities.items():
-        text = text.replace(entity, char)
-
-    text = re.sub(r"<[^>]+>", EMPTY_STRING, text)
-
-    return text
+    return re.sub(r"<[^>]+>", EMPTY_STRING, unescape(text))
 
 
-def truncate_body(text: str, max_length: int = MAX_BODY_LENGTH) -> str:
+def truncate_text(text: str, max_length: int, suffix: str) -> str:
     """
-    Trunca o corpo do PR se ultrapassar max_length caracteres.
-    Adiciona um sufixo para indicar que o conteúdo foi cortado,
-    preservando integridade semântica até o ponto de corte.
+    Trunca um texto quando ele ultrapassa o tamanho máximo permitido.
+
+    O sufixo de truncamento é incluído dentro do limite final para deixar
+    explícito que o conteúdo foi reduzido antes de seguir no pipeline.
+
+    Args:
+        text: Texto que pode ser truncado.
+        max_length: Quantidade máxima de caracteres permitida.
+        suffix: Marcador textual adicionado ao final do texto truncado.
+
+    Returns:
+        Texto original quando estiver dentro do limite, ou texto truncado
+        com o marcador de truncamento.
     """
     if len(text) <= max_length:
         return text
 
-    cutoff = max_length - len(BODY_TRUNCATION_SUFFIX)
-    return text[:cutoff] + BODY_TRUNCATION_SUFFIX
+    cutoff = max(max_length - len(suffix), 0)
+    return text[:cutoff] + suffix[: max_length - cutoff]
 
 
-def clean_title(raw: str | None) -> str:
+def clean_text(value: str | None, fallback: str = EMPTY_STRING) -> str:
     """
-    Limpa o título do PR:
-         Substitui None/vazio por valor sentinela.
-         Remove caracteres de controle.
-         Remove artefatos HTML.
-         Faz strip de espaços em branco.
+    Aplica a sequência padrão de limpeza textual.
+
+    A função centraliza o tratamento comum usado por campos como html_url,
+    repo, path, author e commit_id. Ela é pura e determinística.
+
+    Args:
+        value: Texto original, podendo ser None.
+        fallback: Valor usado quando o texto original estiver ausente.
+
+    Returns:
+        Texto limpo, sem nulos, caracteres de controle, artefatos HTML e
+        espaços desnecessários nas extremidades.
     """
-    title = replace_null(raw, UNKNOWN_TITLE)
-
-    if title == UNKNOWN_TITLE:
-        return title
-
-    title = remove_control_characters(title)
-    title = remove_html_artifacts(title)
-    title = strip_whitespace(title)
-
-    return title if title else UNKNOWN_TITLE
+    return strip_whitespace(
+        remove_html_artifacts(
+            remove_control_characters(
+                replace_null(value, fallback),
+            )
+        )
+    )
 
 
-def clean_body(raw: str | None) -> str:
+def clean_body(body: str | None) -> str:
     """
-    Limpa o corpo do PR:
-        1. Substitui None por string vazia.
-        2. Remove caracteres de controle.
-        3. Remove artefatos HTML.
-        4. Faz strip de espaços em branco.
-        5. Trunca se exceder MAX_BODY_LENGTH.
+    Limpa e trunca o corpo do comentário do pull request.
+
+    O campo body é usado nas etapas de classificação e cálculo de métricas,
+    então precisa chegar ao restante do pipeline em formato textual seguro.
+
+    Args:
+        body: Corpo bruto do comentário, podendo ser None.
+
+    Returns:
+        Corpo limpo e limitado por MAX_BODY_LENGTH.
     """
-    body = replace_null(raw, EMPTY_STRING)
-
-    if not body:
-        return EMPTY_STRING
-
-    body = remove_control_characters(body)
-    body = remove_html_artifacts(body)
-    body = strip_whitespace(body)
-    body = truncate_body(body)
-
-    return body
+    return truncate_text(
+        clean_text(body),
+        MAX_BODY_LENGTH,
+        BODY_TRUNCATION_SUFFIX,
+    )
 
 
-def clean_author(raw: str | None) -> str:
+def clean_diff_hunk(diff_hunk: str | None) -> str:
     """
-    Limpa o autor do PR:
-        1. Substitui None/vazio por string vazia.
-        2. Remove caracteres de controle.
-        3. Faz strip de espaços em branco.
+    Limpa e trunca o trecho de diff associado ao comentário.
+
+    O diff_hunk pode ser usado como contexto adicional para inferência de
+    linguagem e natureza da contribuição, mas deve ser limitado para evitar
+    excesso de contexto nas etapas posteriores.
+
+    Args:
+        diff_hunk: Trecho bruto do diff, podendo ser None.
+
+    Returns:
+        Diff limpo e limitado por MAX_DIFF_HUNK_LENGTH.
     """
-    author = replace_null(raw, EMPTY_STRING)
-
-    if not author:
-        return EMPTY_STRING
-
-    author = remove_control_characters(author)
-    author = strip_whitespace(author)
-
-    return author
+    return truncate_text(
+        clean_text(diff_hunk),
+        MAX_DIFF_HUNK_LENGTH,
+        DIFF_TRUNCATION_SUFFIX,
+    )
 
 
-def clean_pr_record(record: PRRecord) -> CleanPRRecord:
+def clean_optional_text(value: str | None) -> str | None:
     """
-    Aplica o pipeline completo de limpeza a um PRRecord bruto.
+    Limpa um campo textual opcional preservando ausência como None.
 
-    Função pura: mesma entrada → sempre a mesma saída.
-    Nenhum estado externo é lido ou modificado.
+    Essa função é útil para campos que podem realmente não existir no dataset,
+    como language e created_at, evitando transformar ausência semântica em
+    string vazia.
+
+    Args:
+        value: Texto opcional de entrada.
+
+    Returns:
+        Texto limpo quando houver conteúdo, ou None quando o campo estiver
+        ausente ou vazio.
     """
-    return CleanPRRecord(
-        title=clean_title(record.title),
+    cleaned = clean_text(value)
+    return cleaned if cleaned else None
+
+
+def clean_pr_record(record: PRRecord) -> PRRecord:
+    """
+    Aplica a limpeza completa a um PRRecord bruto.
+
+    A função não altera o registro original. Em vez disso, cria uma nova
+    instância de PRRecord com os campos textuais limpos, respeitando a
+    imutabilidade exigida pela arquitetura funcional do projeto.
+
+    Args:
+        record: Registro bruto produzido pela etapa de ingestão.
+
+    Returns:
+        Nova instância de PRRecord contendo os campos textuais limpos e os
+        campos não textuais preservados.
+    """
+    return PRRecord(
+        id=record.id,
+        html_url=clean_text(record.html_url),
+        repo=clean_text(record.repo),
+        path=clean_text(record.path),
         body=clean_body(record.body),
-        author=clean_author(record.author),
-        language=replace_null(record.language, "unknown"),
-        project_type=replace_null(record.project_type, "unknown"),
-        contribution_nature=replace_null(record.contribution_nature, "unknown"),
-        clarity_level=record.clarity_level if record.clarity_level is not None else 0,
-        created_at=record.created_at if record.created_at is not None else date.min,
+        diff_hunk=clean_diff_hunk(record.diff_hunk),
+        author=clean_text(record.author),
+        author_association=clean_text(record.author_association),
+        commit_id=clean_text(record.commit_id),
+        line=record.line,
+        language=clean_optional_text(record.language),
+        created_at=clean_optional_text(record.created_at),
     )
