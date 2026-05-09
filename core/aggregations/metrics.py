@@ -11,15 +11,24 @@ Responsabilidades:
     - Calcular a distribuição de frequência dos níveis de clareza
       (insuficiente, básica, boa, excelente) por grupo, para alimentar
       os gráficos de correlação da Issue 07.
+    - Implementar `correlation_summary(groups)` que, dado um dicionário
+      de grupos (saída de grouping.py), computa métricas comparativas
+      entre grupos para evidenciar padrões de contribuição.
     - Todas as funções devem ser puras e operar sobre estruturas imutáveis.
 
 Não deve:
     - Realizar I/O, chamadas a LLMs ou lógica de plotagem.
+    - Depender de bibliotecas estatísticas externas (numpy/pandas);
+      usar apenas a stdlib e functools para manter a pureza funcional.
     - Depender de bibliotecas estatísticas externas (numpy/pandas).
 
 Relacionado a:
     - Issue 06 (distribuição de tamanho de descrição)
     - Issue 07 (correlação entre clareza, tipo e linguagem)
+    - HU 06 (distribuição de chars/palavras estratificada)
+    - HU 07 (padrões de contribuição entre dimensões)
+    - Regra Funcional 01 (reduce() para cálculos de agregação)
+    - Conceito-Chave 03 (reduce para agregação)
 """
 from functools import reduce
 from typing import Iterable
