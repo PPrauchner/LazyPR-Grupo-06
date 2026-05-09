@@ -28,68 +28,6 @@ Relacionado a:
     - Regra Funcional 03 (imutabilidade de dados)
 """
 
-<<<<<<< Rafael
-from typing import Literal
-from typing import NamedTuple
-
-UNKNOWN_PROJECT_TYPE = "unknown"
-UNKNOWN_PR_NATURE = "unknown"
-UNKNOWN_CLARITY_LEVEL = "unknown"
-
-ProjectType = Literal[
-    "library",
-    "web_app",
-    "framework",
-    "cli",
-    "other",
-    "unknown",
-]
-
-PRNature = Literal[
-    "bug_fix",
-    "feature",
-    "refactoring",
-    "documentation",
-    "other",
-    "unknown",
-]
-
-ClarityLevel = Literal[
-    "insufficient",
-    "basic",
-    "good",
-    "excellent",
-    "unknown",
-]
-
-
-class AnalysisResult(NamedTuple):
-    """
-    Registro enriquecido produzido ao final do pipeline de analise.
-
-    Este tipo estende o PRRecord bruto de forma estrutural: ele mantem todos os
-    campos do registro original e acrescenta os atributos produzidos pelas
-    etapas de classificacao e normalizacao.
-
-    As classificacoes usam vocabulario controlado. Quando uma classificacao nao
-    estiver disponivel por falha de LLM, cache miss ou resposta invalida, o
-    pipeline deve preencher o campo correspondente com "unknown".
-
-    A
-        Campos herdados do PRRecord:
-        id: Identificador do comentario no dataset original.
-        html_url: URL do comentario no GitHub.
-        repo: Repositorio extraido da html_url, no formato "owner/name".
-        path: Caminho do arquivo comentado no pull request.
-        body: Texto limpo do comentario.
-        diff_hunk: Trecho do diff associado ao comentario.
-        author: Login do autor do comentario.
-        author_association: Relacao do autor com o repositorio.
-        commit_id: Hash do commit associado ao comentario.
-        line: Linha do arquivo relacionada ao comentario.
-        language: Linguagem inferida ou normalizada para o registro.
-        created_at: Data de criacao quando disponivel; caso contrario, None.
-=======
 from typing import NamedTuple
 
 
@@ -118,7 +56,6 @@ class AnalysisResult(NamedTuple):
         clarity_level: Clareza da descrição ("insufficient"|"basic"|"good"|"excellent").
         char_count: Contagem de caracteres do body.
         word_count: Contagem de palavras do body.
->>>>>>> Development
     """
 
     id: int
@@ -131,18 +68,10 @@ class AnalysisResult(NamedTuple):
     author_association: str
     commit_id: str
     line: int
-<<<<<<< Rafael
-    language: str
-    created_at: str | None
-    project_type: ProjectType
-    pr_nature: PRNature
-    clarity_level: ClarityLevel
-=======
     language: str | None
     created_at: str | None
     project_type: str
     pr_nature: str
     clarity_level: str
->>>>>>> Development
     char_count: int
     word_count: int
