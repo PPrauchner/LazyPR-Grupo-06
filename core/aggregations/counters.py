@@ -133,3 +133,4 @@ def count_by_pr_nature(
         records,
         lambda record: record.pr_nature,
     )
+"""
