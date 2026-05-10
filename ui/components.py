@@ -35,9 +35,24 @@ from services.exporters import to_download_bytes
 
 
 def status_banner(message: str, status_type: str = "info") -> None:
-    """
-    Exibe banner de status (progresso, sucesso, erro).
-    Utiliza Dispatch Table (Dicionário) para evitar if/else longos (Clean Code).
+    """Exibe um banner de status (progresso, sucesso, erro) na interface.
+
+    Utiliza o padrão Dispatch Table (dicionário de funções) para evitar
+    estruturas condicionais longas (if/else), mantendo o código limpo, 
+    declarativo e alinhado a boas práticas.
+
+    Args:
+        message (str): A mensagem descritiva a ser exibida no banner.
+        status_type (str): O nível/tipo do alerta. Valores suportados:
+            "success", "error", "warning" ou "info". Padrão: "info".
+
+    Returns:
+        None: A função atua apenas causando efeito colateral na interface
+        do Streamlit (renderização).
+
+    Exemplo:
+        >>> status_banner("Dataset carregado com sucesso!", status_type="success")
+        >>> status_banner("Colunas obrigatórias ausentes.", status_type="error")
     """
     banners = {
         "success": st.success,
@@ -46,13 +61,28 @@ def status_banner(message: str, status_type: str = "info") -> None:
         "info": st.info
     }
     
-    # Busca a função correspondente, se não existir cai no fallback (st.info)
     banner_func = banners.get(status_type, st.info)
     banner_func(message)
 
 
 def download_buttons(results: Iterable[AnalysisResult]) -> None:
-    """Renderiza botões de download para CSV e JSON no dashboard."""
+    """Renderiza botões de download interativos para os resultados da análise.
+
+    Delega a lógica de serialização para `to_download_bytes()` do módulo
+    `exporters`, mantendo em memória os dados transformados em CSV/JSON
+    sem gravação intermediária em disco, preservando a pureza I/O onde possível.
+
+    Args:
+        results (Iterable[AnalysisResult]): Coleção imutável de resultados
+            já classificados e enriquecidos pelo pipeline do sistema.
+
+    Returns:
+        None: Modifica apenas a renderização do Streamlit injetando colunas e botões.
+
+    Exemplo:
+        >>> registros_processados = (AnalysisResult(...), AnalysisResult(...))
+        >>> download_buttons(registros_processados)
+    """
     col1, col2 = st.columns(2)
     
     with col1:
@@ -62,11 +92,11 @@ def download_buttons(results: Iterable[AnalysisResult]) -> None:
             file_name="analise_prs.csv",
             mime="text/csv",
         )
-        
+
     with col2:
         st.download_button(
             label="📥 Baixar JSON",
             data=to_download_bytes(results, fmt="json"),
-            file_name="analise_prs.jsonl",
+            file_name="analise_prs.json",
             mime="application/json",
         )
