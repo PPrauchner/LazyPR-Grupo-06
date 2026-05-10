@@ -34,6 +34,7 @@ import unicodedata
 from html import unescape
 
 from core.models.pr_record import PRRecord
+from typing import Iterable as _Iterable
 
 MAX_BODY_LENGTH = 1_500
 MAX_DIFF_HUNK_LENGTH = 2_000
@@ -247,3 +248,14 @@ def clean_pr_record(record: PRRecord) -> PRRecord:
         language=clean_optional_text(record.language),
         created_at=clean_optional_text(record.created_at),
     )
+
+REQUIRED_COLUMNS: frozenset[str] = frozenset({
+    "id", "html_url", "path", "body", "diff_hunk", "user", 
+    "author_association", "commit_id", "line",
+})
+
+def get_missing_columns(header: _Iterable[str]) -> tuple[str, ...]:
+    """Verifica colunas ausentes usando teoria de conjuntos (função pura)."""
+    header_set = frozenset(col.strip() for col in header)
+    missing = REQUIRED_COLUMNS.difference(header_set)
+    return tuple(sorted(missing))
