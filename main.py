@@ -1,6 +1,4 @@
 """
-main.py
-========
 Ponto de entrada da aplicação Streamlit, responsável por orquestrar
 a inicialização do sistema e o roteamento entre páginas.
 
@@ -23,3 +21,34 @@ Relacionado a:
     - Regra Geral 08 (interface gráfica obrigatória)
     - Dica 04 (Streamlit como framework de interface)
 """
+
+import streamlit as st
+
+from pages.overview_dashboard import (
+    render_overview,
+)
+
+from pages.correlation_dashboard import (
+    render_correlation_dashboard,
+)
+
+records = st.session_state.get(
+    "analysis_results",
+    (),
+)
+
+page = st.sidebar.selectbox(
+    "Selecione a página",
+    (
+        "Overview",
+        "Correlação",
+    ),
+)
+
+if page == "Overview":
+
+    render_overview(records)
+
+elif page == "Correlação":
+
+    render_correlation_dashboard(records)
