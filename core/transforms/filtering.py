@@ -29,7 +29,6 @@ Relacionado a:
     - Conceito-Chave 07 (lambda para filtros inline)
 """
 
-<<<<<<< Rafael
 from collections.abc import Callable
 
 from core.models.analysis_result import AnalysisResult
@@ -127,44 +126,3 @@ def build_filter(*predicates: Predicate) -> Predicate:
         satisfizer todos os critérios ativos.
     """
     return lambda record: all(predicate(record) for predicate in predicates)
-=======
-from typing import Callable, Any
-
-# Definindo o tipo Predicate: uma função que recebe um registro e retorna booleano
-Predicate = Callable[[Any], bool]
-
-def is_language(target_language: str) -> Predicate:
-    """Retorna um predicado puro que verifica a linguagem."""
-    return lambda record: getattr(record, 'language', '').lower() == target_language.lower()
-
-def has_project_type(target_type: str) -> Predicate:
-    """Retorna um predicado puro que verifica o tipo de projeto (pós-LLM)."""
-    return lambda record: getattr(record, 'project_type', '') == target_type
-
-def has_pr_nature(target_nature: str) -> Predicate:
-    """Retorna um predicado puro que verifica a natureza da contribuição (pós-LLM)."""
-    return lambda record: getattr(record, 'pr_nature', '') == target_nature
-
-def has_clarity_level(target_level: str) -> Predicate:
-    """Retorna um predicado puro que verifica o nível de clareza da descrição (pós-LLM)."""
-    return lambda record: getattr(record, 'clarity_level', '') == target_level
-
-def is_in_date_range(start_date: str, end_date: str) -> Predicate:
-    """
-    Retorna um predicado puro que verifica se a data do PR está no intervalo.
-    Assume que 'created_at' está num formato string comparável (ex: ISO 8601 YYYY-MM-DD).
-    """
-    return lambda record: start_date <= getattr(record, 'created_at', '')[:10] <= end_date
-
-def build_filter(*predicates: Predicate) -> Predicate:
-    """
-    Compõe múltiplos predicados em uma única função de filtro via conjunção lógica (AND).
-    Utiliza avaliação preguiçosa e conceitos de programação funcional (sem laços de repetição).
-    """
-    if not predicates:
-        return lambda _: True  # Identidade: sem filtros, permite a passagem de todos
-    
-    # map() aplica a avaliação de cada predicado ao registro atual
-    # all() garante que o registro só passa se TODOS os predicados retornarem True
-    return lambda record: all(map(lambda p: p(record), predicates))
->>>>>>> Development
