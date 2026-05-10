@@ -36,30 +36,40 @@ import plotly.express as px
 def distribution_chart(
     stats: dict, dimension: str = "char", title: str = ""
 ) -> go.Figure:
-    """Cria histograma de distribuição a partir da saída de description_stats().
+    """Renderiza um histograma a partir da saída de `metrics.description_stats()`.
 
-    FIX: alinhado com o contrato real de metrics.description_stats(), que retorna:
-        {
-            "char": {"min", "max", "mean", "median", "values": tuple},
-            "word": {"min", "max", "mean", "median", "values": tuple},
-            "total_records": int
-        }
-    A dimensão deve ser "char" ou "word" (chaves do dict retornado por description_stats).
+    Exibe a distribuição bruta de valores para `char_count` ou `word_count`
+    com linhas verticais de referência para a média e a mediana.
 
     Args:
-        stats:     Saída de metrics.description_stats().
-        dimension: "char" para char_count, "word" para word_count.
-        title:     Título customizado (opcional).
+        stats (dict): Dicionário retornado por `metrics.description_stats()`,
+            com a estrutura::
+
+                {
+                    "char": {"min", "max", "mean", "median", "values": tuple},
+                    "word": {"min", "max", "mean", "median", "values": tuple},
+                    "total_records": int
+                }
+
+        dimension (str): Métrica a plotar — "char" para contagem de caracteres,
+            "word" para contagem de palavras. Padrão: "char".
+        title (str): Título customizado opcional. Quando vazio, um título
+            padrão baseado na dimensão é utilizado.
 
     Returns:
-        plotly.graph_objects.Figure com histograma + linhas de média e mediana.
+        go.Figure: Figura Plotly com histograma e duas linhas verticais
+        marcando a média (tracejada) e a mediana (pontilhada).
 
     Raises:
-        ValueError: Se dimension não for "char" ou "word".
-        KeyError: Se stats não contiver a chave de dimension ou "values".
+        ValueError: Se `dimension` não for "char" ou "word".
+        KeyError: Se `stats` não contiver a estrutura esperada.
+
+    Exemplo:
+        >>> stats = description_stats(results)
+        >>> fig = distribution_chart(stats, dimension="char")
+        >>> st.plotly_chart(fig)
     """
-    valid_dimensions = ("char", "word")
-    if dimension not in valid_dimensions:
+    if dimension not in ("char", "word"):
         raise ValueError(
             f"Dimensão inválida: '{dimension}'. Use 'char' ou 'word'."
         )
@@ -126,19 +136,29 @@ def distribution_chart(
 def distribution_chart_from_bins(
     data: dict, dimension: str, title: str = ""
 ) -> go.Figure:
-    """Cria gráfico de barras para distribuição em bins pré-calculados.
+    """Renderiza um gráfico de barras a partir de dados de frequência já agrupados em bins.
 
-    Alternativa a distribution_chart() para quando se usa char_distribution()
-    ou word_distribution() (que já retornam bins agrupados).
+    Alternativa a `distribution_chart()` para quando os dados já foram
+    agrupados por `metrics.char_distribution()` ou `metrics.word_distribution()`.
 
     Args:
-        data:      Dict com frequências por bin — saída de char_distribution()
-                   ou word_distribution(). Ex: {"0-100": 15, "100-200": 42}
-        dimension: "char_count" ou "word_count" — usado nos rótulos.
-        title:     Título customizado (opcional).
+        data (dict): Dicionário mapeando rótulos de bin a contagens de frequência —
+            saída de `char_distribution()` ou `word_distribution()`.
+            Exemplo: {"0-100": 15, "100-200": 42, "200-500": 31, "500+": 8}
+        dimension (str): Determina rótulos de eixo e título padrão. Deve ser um
+            de: "char_count", "word_count" ou "clarity".
+        title (str): Título customizado opcional.
 
     Returns:
-        plotly.graph_objects.Figure com gráfico de barras por bin.
+        go.Figure: Figura Plotly com gráfico de barras, uma barra por bin.
+
+    Raises:
+        ValueError: Se `dimension` não for um dos valores aceitos.
+
+    Exemplo:
+        >>> bins = char_distribution(results)
+        >>> fig = distribution_chart_from_bins(bins, dimension="char_count")
+        >>> st.plotly_chart(fig)
     """
     valid_dimensions = ("char_count", "word_count", "clarity")
     if dimension not in valid_dimensions:
@@ -147,9 +167,21 @@ def distribution_chart_from_bins(
         )
 
     dimension_config = {
-        "char_count": {"title": title or "Distribuição de Caracteres (bins)", "x_title": "Faixa de Caracteres", "color": "#636EFA"},
-        "word_count": {"title": title or "Distribuição de Palavras (bins)",    "x_title": "Faixa de Palavras",    "color": "#EF553B"},
-        "clarity":    {"title": title or "Distribuição de Clareza",            "x_title": "Nível de Clareza",     "color": "#00CC96"},
+        "char_count": {
+            "title": title or "Distribuição de Caracteres (bins)",
+            "x_title": "Faixa de Caracteres",
+            "color": "#636EFA",
+        },
+        "word_count": {
+            "title": title or "Distribuição de Palavras (bins)",
+            "x_title": "Faixa de Palavras",
+            "color": "#EF553B",
+        },
+        "clarity": {
+            "title": title or "Distribuição de Clareza",
+            "x_title": "Nível de Clareza",
+            "color": "#00CC96",
+        },
     }
 
     config = dimension_config[dimension]
@@ -182,21 +214,31 @@ def distribution_chart_from_bins(
 
 
 def bar_chart_by_category(
-    counts: dict, title: str = "", x_title: str = "", y_title: str = "Frequência"
+    counts: dict,
+    title: str = "",
+    x_title: str = "",
+    y_title: str = "Frequência",
 ) -> go.Figure:
-    """Cria gráfico de barras para contagens por categoria.
+    """Renderiza um gráfico de barras para contagens de frequência por categoria.
 
-    Função pura: recebe dados já agregados de counters.py.
+    Aceita dados pré-agregados de qualquer função de contagem em
+    `core/aggregations/counters.py` e produz um gráfico de barras com
+    uma barra por categoria.
 
     Args:
-        counts:  Dict com frequências por categoria.
-                 Ex: {"Python": 120, "JavaScript": 85, "Go": 45}
-        title:   Título customizado.
-        x_title: Título do eixo X.
-        y_title: Título do eixo Y.
+        counts (dict): Dicionário mapeando rótulos de categoria a contagens.
+            Exemplo: {"Python": 120, "JavaScript": 85, "Go": 45}
+        title (str): Título do gráfico. Padrão: "Distribuição por Categoria".
+        x_title (str): Rótulo do eixo X. Padrão: "Categoria".
+        y_title (str): Rótulo do eixo Y. Padrão: "Frequência".
 
     Returns:
-        plotly.graph_objects.Figure com gráfico de barras.
+        go.Figure: Figura Plotly com gráfico de barras verticais.
+
+    Exemplo:
+        >>> counts = count_by_language(results)
+        >>> fig = bar_chart_by_category(counts, title="PRs por Linguagem")
+        >>> st.plotly_chart(fig)
     """
     categories = tuple(counts.keys())
     values = tuple(counts.values())
@@ -227,18 +269,23 @@ def bar_chart_by_category(
 
 
 def correlation_heatmap(matrix: dict, title: str = "") -> go.Figure:
-    """Cria heatmap para correlação multidimensional.
+    """Renderiza um heatmap para dados de correlação multidimensional.
 
-    TODO: Issue #07 — implementação completa pendente.
-    Atualmente retorna placeholder visual para não bloquear o desenvolvimento
-    das outras issues.
+    Destinado a visualizar a relação entre nível de clareza, tipo de projeto
+    e linguagem de programação, conforme produzido por `metrics.correlation_summary()`.
+
+    Nota:
+        Implementação completa pendente da Issue #07. A função retorna
+        atualmente uma figura placeholder para que as páginas de UI dependentes
+        possam ser desenvolvidas sem bloqueio.
 
     Args:
-        matrix: Dict com correlações entre dimensões.
-        title:  Título customizado.
+        matrix (dict): Dados de correlação entre dimensões, conforme retornado
+            por `metrics.correlation_summary()`.
+        title (str): Título customizado opcional.
 
     Returns:
-        plotly.graph_objects.Figure (placeholder até Issue #07).
+        go.Figure: Figura Plotly (placeholder até a Issue #07).
     """
     fig = go.Figure()
     fig.add_annotation(
