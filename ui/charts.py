@@ -46,6 +46,3 @@ def bar_chart_by_category(data: dict, title: str):
     fig = px.bar(df, x="Categoria", y="Quantidade", title=title)
 
     return fig
-
-
-# qualquer coisinha
