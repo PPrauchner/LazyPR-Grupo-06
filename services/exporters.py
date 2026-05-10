@@ -1,8 +1,8 @@
 """
 services/exporters.py
 ======================
-Implementa a exportação dos resultados enriquecidos para formatos
-portáveis consumíveis por ferramentas externas de ciência de dados.
+Serializa os resultados enriquecidos em formatos portáveis consumíveis
+por ferramentas externas de ciência de dados.
 
 Responsabilidades:
     - Implementar `export_csv(results, filepath)` que serializa uma coleção
@@ -35,17 +35,34 @@ from core.models.analysis_result import AnalysisResult
 CSV_FIELDNAMES = [
     "id", "repo", "path", "author", "author_association", "body",
     "diff_hunk", "language", "char_count", "word_count", "project_type",
-    "pr_nature", "clarity_level", "html_url", "commit_id", "line", "created_at"
+    "pr_nature", "clarity_level", "html_url", "commit_id", "line", "created_at",
 ]
 
 
 def _analysis_result_to_dict(result: AnalysisResult) -> dict:
-    """Converte AnalysisResult para dict alinhado com CSV_FIELDNAMES via Dictionary Comprehension (Clean Code)."""
+    """Converte um `AnalysisResult` em dicionário alinhado com `CSV_FIELDNAMES`.
+
+    Args:
+        result (AnalysisResult): Registro enriquecido produzido pelo pipeline.
+
+    Returns:
+        dict: Dicionário com exatamente as chaves de `CSV_FIELDNAMES`, mapeando
+        cada nome de campo ao valor correspondente no registro.
+    """
     return {field: getattr(result, field) for field in CSV_FIELDNAMES}
 
 
 def _write_csv_to_stream(stream: TextIO, results: Iterable[AnalysisResult]) -> None:
-    """Helper para encapsular a escrita CSV e evitar repetição de código (DRY)."""
+    """Escreve uma sequência de registros em um stream de texto aberto no formato CSV.
+
+    Escreve uma linha de cabeçalho seguida de uma linha de dados por registro.
+    A ordem dos campos segue `CSV_FIELDNAMES`.
+
+    Args:
+        stream (TextIO): Stream de texto aberto para escrita (ex: `open()` ou
+            `io.StringIO()`).
+        results (Iterable[AnalysisResult]): Registros a serializar.
+    """
     writer = csv.DictWriter(stream, fieldnames=CSV_FIELDNAMES)
     writer.writeheader()
     for result in results:
@@ -53,14 +70,36 @@ def _write_csv_to_stream(stream: TextIO, results: Iterable[AnalysisResult]) -> N
 
 
 def _write_json_to_stream(stream: TextIO, results: Iterable[AnalysisResult]) -> None:
-    """Helper para encapsular a escrita JSON Lines e evitar repetição de código (DRY)."""
+    """Escreve uma sequência de registros em um stream de texto aberto no formato JSON Lines.
+
+    Cada registro é serializado como um objeto JSON em sua própria linha
+    (JSONL / newline-delimited JSON), tornando a saída compatível com
+    pipelines externos de dados.
+
+    Args:
+        stream (TextIO): Stream de texto aberto para escrita (ex: `open()` ou
+            `io.StringIO()`).
+        results (Iterable[AnalysisResult]): Registros a serializar.
+    """
     for result in results:
         row = _analysis_result_to_dict(result)
         stream.write(json.dumps(row, ensure_ascii=False) + "\n")
 
 
 def export_csv(results: Iterable[AnalysisResult], filepath: str) -> None:
-    """Serializa coleção em arquivo CSV de forma segura (Atomic Write)."""
+    """Serializa uma coleção de registros em arquivo CSV.
+
+    Usa escrita atômica: os dados são gravados em um arquivo temporário
+    e então renomeados para o caminho final. Isso previne arquivos parciais
+    ou corrompidos em caso de interrupção inesperada.
+
+    Args:
+        results (Iterable[AnalysisResult]): Registros a exportar.
+        filepath (str): Caminho do arquivo de destino, ex: "output/results.csv".
+
+    Raises:
+        IOError: Se o arquivo não puder ser escrito ou renomeado.
+    """
     tmp_path = filepath + ".tmp"
     try:
         with open(tmp_path, "w", encoding="utf-8", newline="") as f:
@@ -69,11 +108,22 @@ def export_csv(results: Iterable[AnalysisResult], filepath: str) -> None:
     except IOError as e:
         if os.path.exists(tmp_path):
             os.remove(tmp_path)
-        raise IOError(f"Falha ao escrever CSV {filepath}: {e}") from e
+        raise IOError(f"Falha ao escrever CSV em {filepath}: {e}") from e
 
 
 def export_json(results: Iterable[AnalysisResult], filepath: str) -> None:
-    """Serializa coleção em arquivo JSON Lines de forma segura (Atomic Write)."""
+    """Serializa uma coleção de registros em arquivo JSON Lines.
+
+    Usa a mesma estratégia de escrita atômica de `export_csv`: grava em
+    arquivo temporário e renomeia atomicamente para evitar corrupção.
+
+    Args:
+        results (Iterable[AnalysisResult]): Registros a exportar.
+        filepath (str): Caminho do arquivo de destino, ex: "output/results.jsonl".
+
+    Raises:
+        IOError: Se o arquivo não puder ser escrito ou renomeado.
+    """
     tmp_path = filepath + ".tmp"
     try:
         with open(tmp_path, "w", encoding="utf-8") as f:
@@ -82,19 +132,38 @@ def export_json(results: Iterable[AnalysisResult], filepath: str) -> None:
     except IOError as e:
         if os.path.exists(tmp_path):
             os.remove(tmp_path)
-        raise IOError(f"Falha ao escrever JSON {filepath}: {e}") from e
+        raise IOError(f"Falha ao escrever JSON em {filepath}: {e}") from e
 
 
 def to_download_bytes(results: Iterable[AnalysisResult], fmt: str = "csv") -> bytes:
-    """Retorna dados serializados como bytes para st.download_button em memória."""
+    """Serializa os resultados como bytes para uso com o botão de download do Streamlit.
+
+    Produz a mesma saída de `export_csv` ou `export_json`, mas inteiramente
+    em memória, sem gravar nenhum arquivo temporário em disco. Adequado para
+    passar diretamente a `st.download_button(data=...)`.
+
+    Args:
+        results (Iterable[AnalysisResult]): Registros a serializar.
+        fmt (str): Formato de saída — "csv" ou "json". Padrão: "csv".
+
+    Returns:
+        bytes: Conteúdo serializado codificado em UTF-8.
+
+    Raises:
+        ValueError: Se `fmt` não for "csv" ou "json".
+
+    Exemplo:
+        >>> csv_bytes = to_download_bytes(results, fmt="csv")
+        >>> st.download_button("Baixar CSV", data=csv_bytes, file_name="resultados.csv")
+    """
     if fmt not in ("csv", "json"):
-        raise ValueError(f"Formato inválido: {fmt}. Deve ser 'csv' ou 'json'.")
+        raise ValueError(f"Formato inválido: '{fmt}'. Use 'csv' ou 'json'.")
 
     output = io.StringIO()
-    
+
     if fmt == "csv":
         _write_csv_to_stream(output, results)
     else:
         _write_json_to_stream(output, results)
-        
+
     return output.getvalue().encode("utf-8")
