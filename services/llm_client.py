@@ -32,15 +32,11 @@ import itertools
 from typing import Generator, Iterator
 
 try:
-    from agno.models.groq import Groq
-    from agno.agent import Agent
+    from groq import Groq
 except ImportError as exc:
-    raise ImportError(
-        "Agno não está instalado. Execute: uv add agno"
-    ) from exc
+    raise ImportError("Groq não está instalado. Execute: uv add groq") from exc
 
 from core.models.pr_record import PRRecord
-
 
 # ---------------------------------------------------------------------------
 # Constantes de configuração
@@ -55,15 +51,15 @@ _BACKOFF_FACTOR: float = 0.5  # segundos — base para backoff exponencial
 # ---------------------------------------------------------------------------
 
 
-def _build_client(api_key: str | None) -> Agent:
+def _build_client(api_key: str | None) -> Groq:
     """
-    Factory que constrói o cliente Agno com backend Groq.
+    Factory que constrói o cliente Groq.
 
     Args:
         api_key: Chave de autenticação lida do ambiente.
 
     Returns:
-        Instância de Agent pronta para invocar o modelo.
+        Instância de Groq pronta para invocar o modelo.
 
     Raises:
         ValueError: Se a chave de API não estiver definida.
@@ -73,7 +69,7 @@ def _build_client(api_key: str | None) -> Agent:
             "GROQ_API_KEY não está definida. "
             "Adicione a variável ao arquivo .env antes de executar."
         )
-    return Agent(client=Groq(api_key=api_key))
+    return Groq(api_key=api_key)
 
 
 def _format_record(
@@ -149,14 +145,16 @@ def _build_prompt(
     """
     repo_name = records[0].repo
 
-    system_instructions = "\n".join([
-        "You are an AI assistant classifying the type of a GitHub software project.",
-        "You will receive metadata from Pull Request comments of the *same* repository.",
-        "Infer the project type and return ONLY a JSON object with a single key.",
-        "Valid values for 'project_type': 'library', 'web_app', 'framework', 'cli', 'other'.",
-        "Return ONLY the JSON object. No explanations, no markdown, no extra text.",
-        'Example: {"project_type": "library"}',
-    ])
+    system_instructions = "\n".join(
+        [
+            "You are an AI assistant classifying the type of a GitHub software project.",
+            "You will receive metadata from Pull Request comments of the *same* repository.",
+            "Infer the project type and return ONLY a JSON object with a single key.",
+            "Valid values for 'project_type': 'library', 'web_app', 'framework', 'cli', 'other'.",
+            "Return ONLY the JSON object. No explanations, no markdown, no extra text.",
+            'Example: {"project_type": "library"}',
+        ]
+    )
 
     repo_header = f"\nRepository: {repo_name}"
     prs_header = "\nPR context records:"
@@ -178,7 +176,7 @@ def _build_prompt(
 
 
 def _invoke_with_retry(
-    client: Agent,
+    client: Groq,
     model: str,
     prompt: str,
     max_retries: int = _MAX_RETRIES,
@@ -191,7 +189,7 @@ def _invoke_with_retry(
     e pertence exclusivamente à camada services/.
 
     Args:
-        client: Instância do Agent Agno já configurada.
+        client: Instância do Groq já configurada.
         model: Identificador do modelo a ser utilizado.
         prompt: Prompt completo a ser enviado.
         max_retries: Número máximo de tentativas.
@@ -208,20 +206,23 @@ def _invoke_with_retry(
     # Laço justificado: retry de I/O de rede (services/)
     for attempt in range(max_retries):
         try:
-            response = client.run(prompt=prompt, model=model)
-            if not response:
+            response = client.chat.completions.create(
+                model=model,
+                messages=[{"role": "user", "content": prompt}],
+            )
+            result = response.choices[0].message.content
+            if not result:
                 raise ValueError(
                     f"LLM retornou resposta vazia na tentativa {attempt + 1}."
                 )
-            return response
+            return result
         except Exception as exc:
             last_exc = exc
             if attempt < max_retries - 1:
-                time.sleep(backoff * (2 ** attempt))  # backoff exponencial
+                time.sleep(backoff * (2**attempt))  # backoff exponencial
 
     raise ValueError(
-        f"LLM falhou após {max_retries} tentativas. "
-        f"Último erro: {last_exc}"
+        f"LLM falhou após {max_retries} tentativas. " f"Último erro: {last_exc}"
     ) from last_exc
 
 
