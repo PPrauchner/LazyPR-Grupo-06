@@ -1,4 +1,4 @@
-# Copilot Instructions — Projeto LazyPR (Grupo-06)
+# Gemini Instructions — Projeto LazyPR (Grupo-06)
 
 ---
 
