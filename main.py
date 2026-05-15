@@ -32,18 +32,24 @@ from pages.correlation_dashboard import (
     render_correlation_dashboard,
 )
 
+from ui.sidebar_filters import (
+    render_sidebar,
+)
+
+st.set_page_config(
+    page_title="LazyPR Analytics",
+    page_icon="📊",
+    layout="wide",
+)
+
 records = st.session_state.get(
     "analysis_results",
     (),
 )
 
-page = st.sidebar.selectbox(
-    "Selecione a página",
-    (
-        "Overview",
-        "Correlação",
-    ),
-)
+filters = render_sidebar()
+
+page = filters["page"]
 
 if page == "Overview":
 
