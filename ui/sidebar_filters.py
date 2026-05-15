@@ -3,45 +3,163 @@ Implementa os controles interativos de filtragem global do dashboard,
 traduzindo seleções do usuário em predicados funcionais compostos.
 
 Responsabilidades:
-    - Renderizar widgets de filtragem no sidebar do Streamlit para cada
-      dimensão analisável: linguagem, tipo de projeto, natureza da
-      contribuição e nível de clareza.
-    - Implementar `get_active_filters()` que lê o estado atual dos
-      widgets e retorna uma função de filtro composta (via
-      `core/transforms/filtering.py`) pronta para ser aplicada ao
-      stream de dados.
-    - Garantir que a mudança de qualquer filtro reaplique o pipeline
-      sobre os dados já carregados em cache, sem reler o arquivo.
-    - Manter os filtros sincronizados com `st.session_state` para
-      preservar as seleções do analista durante a navegação entre páginas.
+    - Renderizar widgets de filtragem no sidebar do Streamlit
+    - Centralizar navegação entre páginas
+    - Construir predicados funcionais compostos
+    - Preservar separação entre UI e lógica funcional
 
 Não deve:
-    - Conter lógica de agregação, plotagem ou acesso a LLMs.
-    - Modificar diretamente os dados do dataset.
-
-Relacionado a:
-    - Issue 08 (motor de filtros dinâmicos globais)
-    - HU 08 (filtrar todas as visualizações simultaneamente)
-    - Conceito-Chave 07 (lambda para filtros inline)
+    - Conter lógica de agregação
+    - Renderizar gráficos
+    - Chamar LLMs
 """
+
+from core.transforms.filtering import (
+    Predicate,
+    build_filter,
+    has_clarity_level,
+    has_pr_nature,
+    has_project_type,
+    is_in_date_range,
+    is_language,
+)
 
 import streamlit as st
 
 
+LANGUAGES = (
+    "Python",
+    "JavaScript",
+    "Java",
+    "Go",
+    "TypeScript",
+    "Ruby",
+)
+
+PROJECT_TYPES = (
+    "Framework",
+    "Library",
+    "CLI",
+    "Tool",
+)
+
+PR_NATURES = (
+    "bug_fix",
+    "feature",
+    "refactor",
+    "documentation",
+)
+
+CLARITY_LEVELS = (
+    "excellent",
+    "good",
+    "average",
+    "poor",
+)
+
+
+def get_active_filters() -> Predicate:
+    """
+    Retorna predicado funcional composto
+    baseado nos filtros ativos.
+    """
+
+    active_predicates = []
+
+    selected_languages = st.session_state.get(
+        "selected_languages",
+        (),
+    )
+
+    selected_project_types = st.session_state.get(
+        "selected_project_types",
+        (),
+    )
+
+    selected_natures = st.session_state.get(
+        "selected_natures",
+        (),
+    )
+
+    selected_clarity = st.session_state.get(
+        "selected_clarity",
+        (),
+    )
+
+    use_date_filter = st.session_state.get(
+        "use_date_filter",
+        False,
+    )
+
+    start_date = st.session_state.get(
+        "start_date",
+    )
+
+    end_date = st.session_state.get(
+        "end_date",
+    )
+
+    active_predicates.extend(
+        map(
+            is_language,
+            selected_languages,
+        )
+    )
+
+    active_predicates.extend(
+        map(
+            has_project_type,
+            selected_project_types,
+        )
+    )
+
+    active_predicates.extend(
+        map(
+            has_pr_nature,
+            selected_natures,
+        )
+    )
+
+    active_predicates.extend(
+        map(
+            has_clarity_level,
+            selected_clarity,
+        )
+    )
+
+    if (
+        use_date_filter
+        and start_date
+        and end_date
+    ):
+
+        active_predicates.append(
+            is_in_date_range(
+                start_date,
+                end_date,
+            )
+        )
+
+    return build_filter(
+        *active_predicates,
+    )
+
+
 def render_sidebar() -> dict:
     """
-    Renderiza barra lateral com navegação
-    e filtros da aplicação.
+    Renderiza sidebar global da aplicação.
     """
 
     with st.sidebar:
 
         st.title("RP3 Analytics")
 
-        st.markdown("""
+        st.markdown(
+            """
             Dashboard funcional para análise
             de Pull Requests do GitHub.
-            """)
+            """
+        )
 
         st.divider()
 
@@ -50,7 +168,6 @@ def render_sidebar() -> dict:
             (
                 "Overview",
                 "Correlação",
-                "Distribuições",
             ),
         )
 
@@ -58,41 +175,57 @@ def render_sidebar() -> dict:
 
         selected_languages = st.multiselect(
             "Linguagens",
-            (
-                "Python",
-                "JavaScript",
-                "Go",
-                "Rust",
-            ),
+            LANGUAGES,
+            key="selected_languages",
         )
 
         selected_project_types = st.multiselect(
             "Tipos de Projeto",
-            (
-                "Framework",
-                "Library",
-                "CLI",
-                "Tool",
-            ),
+            PROJECT_TYPES,
+            key="selected_project_types",
+        )
+
+        selected_natures = st.multiselect(
+            "Natureza da Contribuição",
+            PR_NATURES,
+            key="selected_natures",
         )
 
         selected_clarity = st.multiselect(
             "Nível de Clareza",
-            (
-                "excellent",
-                "good",
-                "average",
-                "poor",
-            ),
+            CLARITY_LEVELS,
+            key="selected_clarity",
         )
+
+        use_date_filter = st.checkbox(
+            "Filtrar por data",
+            key="use_date_filter",
+        )
+
+        if use_date_filter:
+
+            dates = st.date_input(
+                "Intervalo de criação",
+                key="date_range",
+            )
+
+            if len(dates) == 2:
+
+                st.session_state["start_date"] = (
+                    dates[0].strftime("%Y-%m-%d")
+                )
+
+                st.session_state["end_date"] = (
+                    dates[1].strftime("%Y-%m-%d")
+                )
 
         st.divider()
 
-        st.caption("Projeto desenvolvido com " "Programação Funcional.")
+        st.caption(
+            "Projeto desenvolvido com "
+            "Programação Funcional."
+        )
 
     return {
         "page": selected_page,
-        "languages": selected_languages,
-        "project_types": selected_project_types,
-        "clarity": selected_clarity,
     }
