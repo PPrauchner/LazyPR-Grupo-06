@@ -14,6 +14,8 @@ Não deve:
     - Chamar LLMs
 """
 
+import streamlit as st
+
 from core.transforms.filtering import (
     Predicate,
     build_filter,
@@ -23,9 +25,6 @@ from core.transforms.filtering import (
     is_in_date_range,
     is_language,
 )
-
-import streamlit as st
-
 
 LANGUAGES = (
     "Python",
@@ -55,6 +54,13 @@ CLARITY_LEVELS = (
     "good",
     "average",
     "poor",
+)
+
+PAGES = (
+    "Upload",
+    "Overview",
+    "Correlação",
+    "Exportação",
 )
 
 
@@ -127,11 +133,7 @@ def get_active_filters() -> Predicate:
         )
     )
 
-    if (
-        use_date_filter
-        and start_date
-        and end_date
-    ):
+    if use_date_filter and start_date and end_date:
 
         active_predicates.append(
             is_in_date_range(
@@ -154,21 +156,16 @@ def render_sidebar() -> dict:
 
         st.title("RP3 Analytics")
 
-        st.markdown(
-            """
+        st.markdown("""
             Dashboard funcional para análise
             de Pull Requests do GitHub.
-            """
-        )
+            """)
 
         st.divider()
 
         selected_page = st.selectbox(
             "Página",
-            (
-                "Overview",
-                "Correlação",
-            ),
+            PAGES,
         )
 
         st.subheader("Filtros")
@@ -211,20 +208,13 @@ def render_sidebar() -> dict:
 
             if len(dates) == 2:
 
-                st.session_state["start_date"] = (
-                    dates[0].strftime("%Y-%m-%d")
-                )
+                st.session_state["start_date"] = dates[0].strftime("%Y-%m-%d")
 
-                st.session_state["end_date"] = (
-                    dates[1].strftime("%Y-%m-%d")
-                )
+                st.session_state["end_date"] = dates[1].strftime("%Y-%m-%d")
 
         st.divider()
 
-        st.caption(
-            "Projeto desenvolvido com "
-            "Programação Funcional."
-        )
+        st.caption("Projeto desenvolvido com " "Programação Funcional.")
 
     return {
         "page": selected_page,
