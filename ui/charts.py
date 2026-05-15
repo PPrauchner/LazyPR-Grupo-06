@@ -286,3 +286,4 @@ def correlation_heatmap(
     )
 
     return figure
+
