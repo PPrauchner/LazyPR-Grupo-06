@@ -3,33 +3,35 @@ Ponto de entrada da aplicação Streamlit, responsável por orquestrar
 a inicialização do sistema e o roteamento entre páginas.
 
 Responsabilidades:
-    - Configurar o layout global do Streamlit (título, ícone, sidebar).
-    - Inicializar o `st.session_state` com os valores padrão necessários
-      para o funcionamento dos filtros e do pipeline entre rerenders.
-    - Verificar se um dataset já foi carregado/analisado e redirecionar
-      o fluxo adequadamente (tela de upload vs. dashboard de análise).
-    - Importar e registrar as páginas da pasta `pages/` no sistema de
-      navegação do Streamlit.
-    - Não deve conter lógica de negócio: apenas composição e inicialização.
+    - Configurar layout global da aplicação
+    - Integrar sidebar global
+    - Centralizar navegação entre páginas
+    - Orquestrar dashboards e páginas visuais
+    - Manter separação entre UI e lógica funcional
 
 Não deve:
-    - Chamar LLMs, ler arquivos ou executar o pipeline diretamente.
-    - Conter transformações de dados ou lógica de plotagem.
-
-Relacionado a:
-    - Todas as issues (ponto de entrada único da aplicação)
-    - Regra Geral 08 (interface gráfica obrigatória)
-    - Dica 04 (Streamlit como framework de interface)
+    - Realizar agregações
+    - Processar datasets
+    - Renderizar gráficos diretamente
+    - Executar lógica de negócio
 """
 
 import streamlit as st
 
-from pages.overview_dashboard import (
+from pages.overview import (
     render_overview,
 )
 
 from pages.correlation_dashboard import (
     render_correlation_dashboard,
+)
+
+from pages.upload import (
+    render_upload_page,
+)
+
+from pages.export import (
+    render_export_page,
 )
 
 from ui.sidebar_filters import (
@@ -51,10 +53,18 @@ filters = render_sidebar()
 
 page = filters["page"]
 
-if page == "Overview":
+if page == "Upload":
+
+    render_upload_page()
+
+elif page == "Overview":
 
     render_overview(records)
 
 elif page == "Correlação":
 
     render_correlation_dashboard(records)
+
+elif page == "Exportação":
+
+    render_export_page(records)
