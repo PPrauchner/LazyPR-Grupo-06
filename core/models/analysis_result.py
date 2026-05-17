@@ -28,7 +28,6 @@ Relacionado a:
     - Regra Funcional 03 (imutabilidade de dados)
 """
 
-<<<<<<< Rafael
 from typing import Literal
 from typing import NamedTuple
 
@@ -89,36 +88,6 @@ class AnalysisResult(NamedTuple):
         line: Linha do arquivo relacionada ao comentario.
         language: Linguagem inferida ou normalizada para o registro.
         created_at: Data de criacao quando disponivel; caso contrario, None.
-=======
-from typing import NamedTuple
-
-
-class AnalysisResult(NamedTuple):
-    """Resultado da análise semântica de um PR.
-
-    Estende PRRecord com classificações obrigatórias do LLM,
-    representando um PR após enriquecimento com tipos de projeto,
-    natureza da contribuição e clareza da descrição.
-
-    Attributes:
-        id: Identificador único do comentário.
-        html_url: URL completa do comentário no GitHub.
-        repo: Repositório no formato "owner/repo".
-        path: Arquivo comentado.
-        body: Texto completo do comentário.
-        diff_hunk: Trecho do diff associado.
-        author: Login do autor.
-        author_association: Relação com repositório.
-        commit_id: ID do commit.
-        line: Número da linha.
-        language: Linguagem do arquivo.
-        created_at: Data de criação.
-        project_type: Tipo de projeto ("library"|"web_app"|"framework"|"cli"|"other").
-        pr_nature: Natureza da contribuição ("bug_fix"|"feature"|"refactoring"|"documentation"|"other").
-        clarity_level: Clareza da descrição ("insufficient"|"basic"|"good"|"excellent").
-        char_count: Contagem de caracteres do body.
-        word_count: Contagem de palavras do body.
->>>>>>> Development
     """
 
     id: int
@@ -131,18 +100,10 @@ class AnalysisResult(NamedTuple):
     author_association: str
     commit_id: str
     line: int
-<<<<<<< Rafael
     language: str
     created_at: str | None
     project_type: ProjectType
     pr_nature: PRNature
     clarity_level: ClarityLevel
-=======
-    language: str | None
-    created_at: str | None
-    project_type: str
-    pr_nature: str
-    clarity_level: str
->>>>>>> Development
     char_count: int
     word_count: int
