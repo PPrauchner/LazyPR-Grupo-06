@@ -28,7 +28,6 @@ Relacionado a:
     - Regra Funcional 07 (filter(), lambda)
     - Conceito-Chave 07 (lambda para filtros inline)
 """
-
 from collections.abc import Callable, Iterable
 from functools import reduce
 
@@ -76,7 +75,7 @@ def by_project_type(project_types: tuple[str, ...]) -> Predicate:
 def by_pr_nature(pr_natures: tuple[str, ...]) -> Predicate:
     """
     Cria um predicado para filtrar registros por natureza da contribuição.
-
+    
     Os valores devem corresponder ao campo pr_nature definido em AnalysisResult,
     como "bug_fix", "feature", "refactoring", "documentation" e "other".
 
@@ -109,24 +108,6 @@ def by_clarity_level(clarity_levels: tuple[str, ...]) -> Predicate:
     allowed = frozenset(map(str.lower, clarity_levels))
     return lambda record: record.clarity_level.lower() in allowed
 
-
-def build_filter(*predicates: Predicate) -> Predicate:
-    """
-    Compõe múltiplos predicados em uma única função de filtro.
-
-    A composição usa conjunção lógica: um registro só passa se todos os
-    predicados ativos retornarem True. Quando nenhum predicado é informado,
-    all() retorna True, permitindo que todos os registros passem.
-
-    Args:
-        *predicates: Predicados individuais criados a partir dos filtros
-            selecionados na interface.
-
-    Returns:
-        Função que recebe um AnalysisResult e retorna True quando o registro
-        satisfizer todos os critérios ativos.
-    """
-    return lambda record: all(predicate(record) for predicate in predicates)
 
 def compose_predicates(predicates: Iterable[Predicate]) -> Predicate:
     """
