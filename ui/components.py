@@ -7,16 +7,14 @@ encapsulam padrões de exibição comuns ao longo do dashboard.
 Responsabilidades:
     - Implementar `metric_card(label, value, delta)` para exibição de
       KPIs de alto nível (total de PRs, distribuição de clareza, etc.).
-    - Implementar `data_table(records, columns)` para renderização
-      interativa de subconjuntos do dataset filtrado com paginação.
-    - Implementar `status_banner(message, type)` para feedback visual
+    - Implementar `data_table(records)` para renderização interativa de
+      subconjuntos do dataset filtrado.
+    - Implementar `status_banner(message, status_type)` para feedback visual
       de progresso do pipeline (ingestão, classificação, exportação).
-    - Implementar `download_buttons(results)` que integra com
-      `exporters.py` para oferecer botões de download CSV e JSON
-      diretamente na interface.
-    - Todos os componentes devem receber dados já processados como
-      argumento — nenhuma lógica de transformação ou acesso a estado
-      global dentro deste módulo.
+    - Implementar `download_buttons(results)` que integra com `exporters.py`
+      para oferecer botões de download CSV e JSON diretamente na interface.
+    - Todos os componentes devem receber dados já processados como argumento —
+      nenhuma lógica de transformação ou acesso a estado global dentro deste módulo.
 
 Não deve:
     - Chamar o pipeline, LLMs ou funções de agregação diretamente.
@@ -29,26 +27,26 @@ Relacionado a:
     - Regra Geral 08 (interface gráfica obrigatória)
 """
 import streamlit as st
-from typing import Iterable
+from typing import Any, Iterable
+
 from core.models.analysis_result import AnalysisResult
 from services.exporters import to_download_bytes
 
-
 def status_banner(message: str, status_type: str = "info") -> None:
-    """Exibe um banner de status (progresso, sucesso, erro) na interface.
+    """Exibe um banner de status colorido na interface do Streamlit.
 
-    Utiliza o padrão Dispatch Table (dicionário de funções) para evitar
-    estruturas condicionais longas (if/else), mantendo o código limpo, 
-    declarativo e alinhado a boas práticas.
+    Utiliza dispatch table (dicionário de funções) para mapear o tipo de
+    status à função de alerta correspondente, evitando estruturas condicionais
+    longas e mantendo o código declarativo.
 
     Args:
-        message (str): A mensagem descritiva a ser exibida no banner.
-        status_type (str): O nível/tipo do alerta. Valores suportados:
+        message (str): Mensagem descritiva a ser exibida no banner.
+        status_type (str): Nível visual do alerta. Valores aceitos:
             "success", "error", "warning" ou "info". Padrão: "info".
+            Valores não reconhecidos fazem fallback para "info".
 
     Returns:
-        None: A função atua apenas causando efeito colateral na interface
-        do Streamlit (renderização).
+        None: Função de efeito colateral — renderiza no Streamlit.
 
     Exemplo:
         >>> status_banner("Dataset carregado com sucesso!", status_type="success")
@@ -58,45 +56,51 @@ def status_banner(message: str, status_type: str = "info") -> None:
         "success": st.success,
         "error": st.error,
         "warning": st.warning,
-        "info": st.info
+        "info": st.info,
     }
-    
+
     banner_func = banners.get(status_type, st.info)
     banner_func(message)
 
 
 def download_buttons(results: Iterable[AnalysisResult]) -> None:
-    """Renderiza botões de download interativos para os resultados da análise.
+    """Renderiza botões de download para CSV e JSON dos resultados da análise.
 
-    Delega a lógica de serialização para `to_download_bytes()` do módulo
-    `exporters`, mantendo em memória os dados transformados em CSV/JSON
-    sem gravação intermediária em disco, preservando a pureza I/O onde possível.
+    Materializa o iterável em tupla imutável antes das chamadas de serialização,
+    pois `results` pode ser um gerador e seria exaurido após a primeira chamada
+    a `to_download_bytes`, resultando em um segundo arquivo vazio.
+
+    A serialização é delegada a `to_download_bytes()` de `services/exporters.py`,
+    mantendo a camada de UI livre de lógica de I/O.
 
     Args:
-        results (Iterable[AnalysisResult]): Coleção imutável de resultados
-            já classificados e enriquecidos pelo pipeline do sistema.
+        results (Iterable[AnalysisResult]): Registros enriquecidos a exportar.
+            Pode ser qualquer iterável, incluindo geradores de uso único.
 
     Returns:
-        None: Modifica apenas a renderização do Streamlit injetando colunas e botões.
+        None: Função de efeito colateral — renderiza no Streamlit.
 
     Exemplo:
-        >>> registros_processados = (AnalysisResult(...), AnalysisResult(...))
-        >>> download_buttons(registros_processados)
+        >>> download_buttons(tuple(st.session_state["results"]))
     """
+    results_tuple = tuple(results)
+
     col1, col2 = st.columns(2)
-    
+
     with col1:
         st.download_button(
             label="📥 Baixar CSV",
-            data=to_download_bytes(results, fmt="csv"),
-            file_name="analise_prs.csv",
+            data=to_download_bytes(results_tuple, fmt="csv"),
+            file_name="analise_pr.csv",
             mime="text/csv",
+            use_container_width=True,
         )
 
     with col2:
         st.download_button(
             label="📥 Baixar JSON",
-            data=to_download_bytes(results, fmt="json"),
-            file_name="analise_prs.json",
+            data=to_download_bytes(results_tuple, fmt="json"),
+            file_name="analise_pr.jsonl",
             mime="application/json",
+            use_container_width=True,
         )
