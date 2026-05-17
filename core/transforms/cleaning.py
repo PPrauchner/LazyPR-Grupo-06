@@ -111,6 +111,50 @@ def remove_html_artifacts(text: str) -> str:
     return re.sub(r"<[^>]+>", EMPTY_STRING, unescape(text))
 
 
+def remove_hidden_comments(text: str) -> str:
+    """
+     Remove os comentários ocultos no formato HTML/markdown.
+     Esses comentários são comuns em templates de alguns pr's do GitHub e consomem
+     muitos tokens desnecessários do contexto de LLM, pois não agregam valor semântico real
+     do texto visível.
+
+    Args:
+        text (str): Texto de entrada
+
+    Returns:
+        Texto sem os blocos de comentários ocultos
+    """
+    return re.sub(r"<!--.*?-->", EMPTY_STRING, text, flags=re.DOTALL)
+
+
+def normalize_line_ending(text: str) -> str:
+    """
+    Padroniza as quebras de linha do formato Windows ou Mac para o padrão Unix.
+    Isso evita problemas de contagem de caracteres na hora de truncar textos e garante
+    previsibilidade no parsing de diff_dunks
+
+    Args:
+        text: texto com potencias quebras de linha mistas.
+
+    Returns:
+        Texto normalizado usando apenas um '\\n'.
+    """
+    return text.replace("\r\n", "\n").replace("\r", "\n")
+
+
+def collapse_spaces(text: str) -> str:
+    """
+    Substitui espaços múltiplos ou tubulações consecutivas por um único espaço
+
+    Args:
+        text: texto bruto
+
+    Returns:
+        texto com espaçamento normalizado
+    """
+    return re.sub(r"[ \t]+", " ", text)
+
+
 def truncate_text(text: str, max_length: int, suffix: str) -> str:
     """
     Trunca um texto quando ele ultrapassa o tamanho máximo permitido.
@@ -150,9 +194,13 @@ def clean_text(value: str | None, fallback: str = EMPTY_STRING) -> str:
         espaços desnecessários nas extremidades.
     """
     return strip_whitespace(
-        remove_html_artifacts(
-            remove_control_characters(
-                replace_null(value, fallback),
+        collapse_spaces(
+            remove_html_artifacts(
+                remove_control_characters(
+                    remove_hidden_comments(
+                        normalize_line_ending(replace_null(value, fallback))
+                    )
+                )
             )
         )
     )
