@@ -13,61 +13,29 @@ Responsabilidades:
 - Disparo do processo de classificação e enriquecimento
 - Persistência do hash da análise para cache posterior
 """
-import csv
 import streamlit as st
 from streamlit.runtime.uploaded_file_manager import UploadedFile
 from core.transforms.cleaning import get_missing_columns
-
-
-def _read_header_lazily(uploaded_file: UploadedFile) -> tuple[str, ...]:
-    """Lê apenas a primeira linha do CSV e rebobina o ponteiro do arquivo.
-
-    Usa `readline()` para consumir somente os bytes necessários para o
-    cabeçalho, sem carregar o restante do arquivo em memória. Após a leitura,
-    o ponteiro é resetado via `seek(0)` diretamente no `BytesIO` interno do
-    Streamlit, garantindo que o pipeline de ingestão leia o arquivo do início.
-
-    Args:
-        uploaded_file (UploadedFile): Objeto de arquivo carregado via
-            `st.file_uploader`. Comporta-se como `BytesIO` internamente.
-
-    Returns:
-        tuple[str, ...]: Tupla imutável com os nomes das colunas lidos da
-        primeira linha do CSV. Retorna tupla vazia se o arquivo estiver vazio
-        ou se ocorrer erro de decodificação.
-    """
-    try:
-        first_line_bytes = uploaded_file.readline()
-        if not first_line_bytes:
-            return ()
-
-        first_line = first_line_bytes.decode("utf-8", errors="replace")
-        header = tuple(next(csv.reader([first_line])))
-    except (StopIteration, UnicodeDecodeError):
-        header = ()
-    finally:
-        uploaded_file.seek(0)
-
-    return header
+from services.ingestion import read_header_lazily
 
 
 def _validate_schema(uploaded_file: UploadedFile) -> bool:
-    """Valida o schema do dataset e exibe feedback ao usuário via Streamlit.
+    """
+    Valida o schema do dataset e exibe o feedback visual correspondente.
 
-    Lê apenas o cabeçalho do arquivo e delega a verificação de colunas
-    obrigatórias à função pura `get_missing_columns` de
-    `core/transforms/cleaning.py`, mantendo a separação entre lógica de
-    negócio (core) e apresentação (ui).
+    Consome a estrutura de cabeçalho obtida de forma lazy pela camada de 
+    ingestão e delega a verificação de conformidade de colunas para uma 
+    função pura de transformação, isolando efeitos colaterais de I/O 
+    da renderização de erros na interface.
 
     Args:
-        uploaded_file (UploadedFile): Objeto de arquivo carregado via
-            `st.file_uploader`, com ponteiro posicionado no início.
+        uploaded_file: Objeto de arquivo binário interceptado pelo Streamlit.
 
     Returns:
-        bool: True quando todas as colunas obrigatórias estão presentes,
-        False quando o arquivo está vazio ou faltam colunas.
+        bool: True se o schema for estritamente válido e contiver todas as 
+        colunas obrigatórias; False caso contrário.
     """
-    header = _read_header_lazily(uploaded_file)
+    header = read_header_lazily(uploaded_file)
 
     if not header:
         st.error("O arquivo enviado está vazio ou é inválido.")
@@ -82,11 +50,13 @@ def _validate_schema(uploaded_file: UploadedFile) -> bool:
 
 
 def render() -> None:
-    """Renderiza a página de upload e dispara o pipeline quando um arquivo válido é enviado.
+    """
+    Renderiza os componentes visuais da página e gerencia o estado do fluxo.
 
-    Exibe o componente de upload, executa a validação de schema (Issue #10)
-    e, quando aprovado, deixa o arquivo posicionado no início para que
-    `services/ingestion.py` inicie a leitura lazy dos registros.
+    Disponibiliza o seletor de arquivos, aciona a esteira de validação de
+    schema e intercepta o fluxo em caso de falha estrutural. Havendo sucesso,
+    estabiliza o ponteiro do arquivo no escopo de sessão para permitir
+    a avaliação lazy nas etapas subsequentes do pipeline.
     """
     st.title("📂 Carregar Dataset")
 
@@ -99,8 +69,11 @@ def render() -> None:
     if not _validate_schema(uploaded_file):
         st.stop()
 
-    st.success("Schema validado! O arquivo está pronto para o processamento lazy.")
-    st.info("Ponteiro do arquivo resetado. Pronto para ingestão.")
+    st.success("Schema validado! O arquivo está pronto para o processamento.")
+
+    if st.button("Iniciar Análise 🚀"):
+        st.session_state["dataset_file"] = uploaded_file
+        st.switch_page("pages/correlations.py")
 
 
 render()
