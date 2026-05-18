@@ -1,31 +1,136 @@
 """
-core/aggregations/counters.py
-==============================
 Fornece funções puras de contagem e distribuição sobre coleções de
-`AnalysisResult`, implementadas exclusivamente com `reduce()` e
-expressões funcionais.
+AnalysisResult, implementadas com reduce() e composição funcional.
 
 Responsabilidades:
-    - Contar o total de PRs agrupados por linguagem de programação,
-      tipo de projeto e natureza da contribuição, via `reduce()`.
-    - Calcular a distribuição percentual de cada categoria em relação
-      ao total do dataset filtrado.
-    - Produzir estruturas de dados imutáveis (tuplas, frozensets ou
-      dicionários read-only) prontas para consumo pelos componentes
-      de visualização.
-    - Suportar contagens estratificadas por combinações de critérios
-      (ex: contagem de PRs do tipo "bug_fix" em projetos "framework"
-      escritos em "Python").
+    - Contar PRs agrupados por:
+        * linguagem
+        * tipo de projeto
+        * natureza da contribuição
+    - Produzir estruturas prontas para visualização.
+    - Evitar mutação direta dos registros originais.
+    - Centralizar agregações reutilizáveis.
 
 Não deve:
-    - Modificar os registros de entrada.
-    - Realizar I/O ou chamar LLMs.
-    - Conter lógica de plotagem.
+    - Realizar I/O
+    - Chamar LLMs
+    - Renderizar gráficos
+"""
 
-Relacionado a:
-    - Issue 05 (volume de PRs estratificado por linguagem, tipo e natureza)
-    - HU 05 (visualização de número de PRs por categorias)
-    - Regra Funcional 01 (uso de reduce() em vez de laços)
-    - Regra Funcional 07 (map, filter, reduce)
-    - Conceito-Chave 03 (reduce para agregação)
+from collections import Counter
+from functools import reduce
+from types import MappingProxyType
+from typing import Any, Callable, Iterable, Mapping
+
+
+def _increment_counter(
+    accumulator: Counter,
+    key: str,
+) -> Counter:
+    """
+    Retorna um novo Counter incrementado sem mutar
+    o acumulador original.
+    """
+
+    return accumulator + Counter([key])
+
+
+def _count_reducer(
+    key_fn: Callable[[Any], str],
+) -> Callable[[Counter, Any], Counter]:
+    """
+    Cria reducer funcional parametrizado.
+
+    Args:
+        key_fn:
+            Função que extrai a chave do registro.
+
+    Returns:
+        Função reducer compatível com reduce().
+    """
+
+    def reducer(
+        accumulator: Counter,
+        record: Any,
+    ) -> Counter:
+
+        key = key_fn(record)
+
+        return _increment_counter(
+            accumulator,
+            key,
+        )
+
+    return reducer
+
+
+def count_by(
+    records: Iterable[Any],
+    key_fn: Callable[[Any], str],
+) -> Mapping[str, int]:
+    """
+    Conta registros por dimensão usando reduce()
+    e composição funcional.
+
+    Args:
+        records:
+            Coleção iterável de registros.
+
+        key_fn:
+            Função responsável por extrair
+            a chave de agrupamento.
+
+    Returns:
+        Estrutura read-only contendo:
+            {
+                categoria: frequência
+            }
+    """
+
+    counts = reduce(
+        _count_reducer(key_fn),
+        records,
+        Counter(),
+    )
+
+    return MappingProxyType(dict(counts))
+
+
+def count_by_language(
+    records: Iterable[Any],
+) -> Mapping[str, int]:
+    """
+    Conta PRs agrupados por linguagem.
+    """
+
+    return count_by(
+        records,
+        lambda record: record.language,
+    )
+
+
+def count_by_project_type(
+    records: Iterable[Any],
+) -> Mapping[str, int]:
+    """
+    Conta PRs agrupados por tipo de projeto.
+    """
+
+    return count_by(
+        records,
+        lambda record: record.project_type,
+    )
+
+
+def count_by_pr_nature(
+    records: Iterable[Any],
+) -> Mapping[str, int]:
+    """
+    Conta PRs agrupados por natureza da contribuição.
+    """
+
+    return count_by(
+        records,
+        lambda record: record.pr_nature,
+    )
 """

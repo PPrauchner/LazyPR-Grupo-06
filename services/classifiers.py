@@ -137,7 +137,9 @@ def _build_analysis_result(
     )
 
 
-def _classify_batch_from_llm(records: tuple[PRRecord, ...]) -> Generator[str, None, None]:
+def _classify_batch_from_llm(
+    records: tuple[PRRecord, ...],
+) -> Generator[str, None, None]:
     """Chama LLM para classificar batch de PRs (mesmo repositório).
 
     Implementação imperativa que chamada o LLM como efeito colateral.
@@ -175,7 +177,9 @@ def _extract_field_from_json(response: str, field: str) -> str:
 # ---------------------------------------------------------------------------
 
 
-def classify_project_type(records: Iterable[PRRecord]) -> Generator[AnalysisResult, None, None]:
+def classify_project_type(
+    records: Iterable[PRRecord],
+) -> Generator[AnalysisResult, None, None]:
     """Classifica tipo de projeto para PRs agrupados por repositório.
 
     Estratégia:
@@ -199,25 +203,25 @@ def classify_project_type(records: Iterable[PRRecord]) -> Generator[AnalysisResu
     """
     # Converte para tuple para permitir groupby
     records_tuple = tuple(records)
-    
+
     # Agrupa por repositório (chave funcional)
     # groupby requer iterable ordenado ou aplicar sorted()
     sorted_records = sorted(records_tuple, key=attrgetter("repo"))
     grouped = groupby(sorted_records, key=attrgetter("repo"))
-    
+
     # Processa cada grupo de repositório
     for repo, repo_records_iter in grouped:
         repo_records = tuple(repo_records_iter)
-        
+
         # Cache key: hash do repositório (mesmo para todos PRs do repo)
         cache_key = hash_record(repo_records[0])
-        
+
         # Define função que constrói AnalysisResult a partir da chamada LLM
         def _llm_to_analysis_results():
             """Closure: chama LLM e retorna generator de AnalysisResult."""
             raw_response = classify_project_type_batch(repo_records)
             project_type = _extract_field_from_json(raw_response, "project_type")
-            
+
             # Constrói AnalysisResult para cada PR do batch
             for record in repo_records:
                 analysis = _build_analysis_result(
@@ -227,7 +231,7 @@ def classify_project_type(records: Iterable[PRRecord]) -> Generator[AnalysisResu
                     clarity_level=_DEFAULT_CLARITY_LEVEL,
                 )
                 yield analysis
-        
+
         # Usa cache (dois níveis) para obter AnalysisResults
         # Se miss: executa _llm_to_analysis_results(), persiste, retorna
         for cached_analysis in cached_classify(_llm_to_analysis_results, cache_key):
@@ -282,3 +286,165 @@ def classify_clarity(record: PRRecord) -> str:
     # Implementação simplificada: retorna "other" por padrão
     # Em produção, integraria com cache dois níveis como em classify_project_type()
     return _DEFAULT_CLARITY_LEVEL
+
+
+from __future__ import annotations
+
+import json
+from collections import defaultdict
+from dataclasses import dataclass
+from enum import Enum
+from typing import Iterable
+
+from core.transforms.cleaning import CleanPRRecord
+
+# Interfaces (substituir pelas implementações reais quando fizer llm_client)
+
+
+def call_llm(prompt: str) -> str:
+    raise NotImplementedError("Implemente em services/llm_client.py")
+
+
+def get_cache(key: str) -> str | None:
+    raise NotImplementedError("Implemente em utils/memoization.py")
+
+
+def set_cache(key: str, value: str) -> None:
+    raise NotImplementedError("Implemente em utils/memoization.py")
+
+
+# Vocabulários controlados
+
+
+class ProjectType(str, Enum):
+    LIBRARY = "library"
+    CLI = "cli"
+    API = "api"
+    WEB_APP = "web_app"
+    DATA_PIPELINE = "data_pipeline"
+    UNKNOWN = "unknown"
+
+
+class PRNature(str, Enum):
+    BUG_FIX = "bug_fix"
+    FEATURE = "feature"
+    REFACTORING = "refactoring"
+    DOCUMENTATION = "documentation"
+    UNKNOWN = "unknown"
+
+
+class ClarityLevel(str, Enum):
+    INSUFICIENTE = "insuficiente"
+    BASICA = "basica"
+    BOA = "boa"
+    EXCELENTE = "excelente"
+
+    @property
+    def score(self) -> int:
+        return {"insuficiente": 1, "basica": 2, "boa": 3, "excelente": 4}[self.value]
+
+
+# Resultados
+@dataclass(frozen=True)
+class ProjectTypeResult:
+    repository: str
+    project_type: ProjectType
+    raw_response: str
+
+
+@dataclass(frozen=True)
+class PRNatureResult:
+    nature: PRNature
+    raw_response: str
+
+
+@dataclass(frozen=True)
+class ClarityResult:
+    level: ClarityLevel
+    score: int
+    raw_response: str
+
+
+def _cached_call(key: str, prompt: str) -> str:
+    """Retorna do cache ou chama o LLM e armazena o resultado."""
+    cached = get_cache(key)
+    if cached is not None:
+        return cached
+    response = call_llm(prompt)
+    set_cache(key, response)
+    return response
+
+
+def _parse(raw: str, field: str) -> str:
+    """Extrai um campo do JSON retornado pelo LLM e normaliza o valor."""
+    try:
+        data = json.loads(
+            raw.strip().removeprefix("```json").removesuffix("```").strip()
+        )
+        return data.get(field, "").strip().lower().replace(" ", "_")
+    except json.JSONDecodeError:
+        return ""
+
+
+_PROMPTS = {
+    "project_type": (
+        'Classifique o tipo do projeto. Responda APENAS com JSON: {"project_type": "<valor>"}\n'
+        "Valores: library, cli, api, web_app, data_pipeline, unknown"
+    ),
+    "nature": (
+        'Classifique a natureza do PR. Responda APENAS com JSON: {"nature": "<valor>"}\n'
+        "Valores: bug_fix, feature, refactoring, documentation, unknown"
+    ),
+    "clarity": (
+        'Avalie a clareza da descrição. Responda APENAS com JSON: {"clarity": "<valor>"}\n'
+        "Valores: insuficiente, basica, boa, excelente\n"
+        "insuficiente=ausente/genérica | basica=sem contexto | boa=explica o porquê | excelente=completa com impacto"
+    ),
+}
+
+
+def classify_project_type(records: Iterable[CleanPRRecord]) -> list[ProjectTypeResult]:
+    """Agrupa PRs por repositório e faz uma única chamada ao LLM por grupo."""
+    groups: dict[str, list[CleanPRRecord]] = defaultdict(list)
+    for r in records:
+        groups[r.repository].append(r)
+
+    results = []
+    for repo, prs in groups.items():
+        sample = "\n".join(f"- {pr.title}" for pr in prs[:10])
+        prompt = f"{_PROMPTS['project_type']}\n\nRepositório: {repo}\nPRs:\n{sample}"
+        raw = _cached_call(f"project_type:{repo}", prompt)
+        value = _parse(raw, "project_type")
+        project_type = (
+            ProjectType(value)
+            if value in ProjectType._value2member_map_
+            else ProjectType.UNKNOWN
+        )
+        results.append(ProjectTypeResult(repo, project_type, raw))
+    return results
+
+
+def classify_pr_nature(record: CleanPRRecord) -> PRNatureResult:
+    """Classifica a natureza do PR
+    Sendo eles: bug_fix, feature, refactoring e documentation."""
+
+    prompt = f"{_PROMPTS['nature']}\n\nTítulo: {record.title}\nDescrição:\n{record.body or '[sem descrição]'}"
+    raw = _cached_call(f"nature:{record.title}:{record.body[:200]}", prompt)
+    value = _parse(raw, "nature")
+    nature = (
+        PRNature(value) if value in PRNature._value2member_map_ else PRNature.UNKNOWN
+    )
+    return PRNatureResult(nature, raw)
+
+
+def classify_clarity(record: CleanPRRecord) -> ClarityResult:
+    """Avalia a clareza da descrição em quatro níveis."""
+    prompt = f"{_PROMPTS['clarity']}\n\nTítulo: {record.title}\nDescrição:\n{record.body or '[sem descrição]'}"
+    raw = _cached_call(f"clarity:{record.title}:{record.body[:200]}", prompt)
+    value = _parse(raw, "clarity")
+    level = (
+        ClarityLevel(value)
+        if value in ClarityLevel._value2member_map_
+        else ClarityLevel.INSUFICIENTE
+    )
+    return ClarityResult(level, level.score, raw)
