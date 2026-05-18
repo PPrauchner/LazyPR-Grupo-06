@@ -42,9 +42,7 @@ _VALID_PROJECT_TYPES = frozenset(["library", "web_app", "framework", "cli", "oth
 _VALID_PR_NATURES = frozenset(
     ["bug_fix", "feature", "refactoring", "documentation", "other"]
 )
-_VALID_CLARITY_LEVELS = frozenset(
-    ["insufficient", "basic", "good", "excellent"]
-)
+_VALID_CLARITY_LEVELS = frozenset(["insufficient", "basic", "good", "excellent"])
 
 # Mapeamento de variações de linguagem para forma canônica
 # Estratégia: map() + filter() para cada variação encontrada
@@ -186,7 +184,9 @@ def normalize_label(label: str, field: str) -> str:
         "project_type": _VALID_PROJECT_TYPES,
         "pr_nature": _VALID_PR_NATURES,
         "clarity_level": _VALID_CLARITY_LEVELS,
-    }.get(field, _VALID_PROJECT_TYPES)  # padrão seguro
+    }.get(
+        field, _VALID_PROJECT_TYPES
+    )  # padrão seguro
 
     # Retorna label se válido, senão "other"
     return normalized_label if normalized_label in valid_vocab else "other"
