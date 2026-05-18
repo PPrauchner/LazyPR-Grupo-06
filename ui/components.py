@@ -48,6 +48,28 @@ def metric_card(label: str, value: Any, delta: Any = None) -> None:
     st.metric(label=label, value=value, delta=delta)
 
 
+def data_table(records: Iterable[AnalysisResult]) -> None:
+    """Renderiza uma tabela interativa para visualização dos registros filtrados.
+
+    Converte o iterável de NamedTuples em dicionários via `map()` e materializa
+    em tupla imutável, necessário pois `st.dataframe` exige uma estrutura
+    completamente indexável para renderização.
+
+    Args:
+        records (Iterable[AnalysisResult]): Registros enriquecidos a exibir.
+
+    Returns:
+        None: Função de efeito colateral — renderiza no Streamlit.
+    """
+    data = tuple(map(lambda r: r._asdict(), records))
+
+    if not data:
+        st.info("Nenhum registro encontrado para os filtros atuais.")
+        return
+
+    st.dataframe(data, use_container_width=True)
+
+
 def status_banner(message: str, status_type: str = "info") -> None:
     """Exibe um banner de status colorido na interface do Streamlit.
 
