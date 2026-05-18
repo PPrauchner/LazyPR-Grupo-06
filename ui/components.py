@@ -32,6 +32,22 @@ from typing import Any, Iterable
 from core.models.analysis_result import AnalysisResult
 from services.exporters import to_download_bytes
 
+
+def metric_card(label: str, value: Any, delta: Any = None) -> None:
+    """Renderiza um cartão de métrica (KPI) de alto nível na interface.
+
+    Args:
+        label (str): Título ou descrição da métrica exibida.
+        value (Any): Valor numérico ou textual exibido em destaque.
+        delta (Any, opcional): Indicador de variação positivo ou negativo.
+            Quando positivo, exibido em verde; quando negativo, em vermelho.
+
+    Returns:
+        None: Função de efeito colateral — renderiza no Streamlit.
+    """
+    st.metric(label=label, value=value, delta=delta)
+
+
 def status_banner(message: str, status_type: str = "info") -> None:
     """Exibe um banner de status colorido na interface do Streamlit.
 
