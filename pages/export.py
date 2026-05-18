@@ -22,7 +22,7 @@ Relacionado a:
 import streamlit as st
 
 from core.aggregations.counters import count_by
-from ui.components import data_table, download_buttons, metric_card
+from ui.components import data_table, download_buttons, metric_card, status_banner
 
 st.set_page_config(page_title="LazyPR - Exportar", page_icon="💾")
 
@@ -43,11 +43,13 @@ def render() -> None:
     st.title("💾 Exportar Resultados")
 
     if "results" not in st.session_state or not st.session_state["results"]:
-        st.warning(
+        status_banner(
             "Nenhum dado processado disponível. "
-            "Por favor, retorne à página de Upload e inicie uma análise."
+            "Por favor, retorne à página de Upload e inicie uma análise.",
+            status_type="warning",
         )
         st.stop()
+        return
 
     results = tuple(st.session_state["results"])
 
