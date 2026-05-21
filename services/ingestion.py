@@ -32,3 +32,132 @@ Relacionado a:
     - Conceito-Chave 01 (lazy evaluation via geradores)
     - Dica 01 (módulos csv/json com geradores linha a linha)
 """
+import csv
+import json
+import hashlib
+from typing import BinaryIO, Iterator, Union, Any
+from contextlib import contextmanager
+
+from core.models.pr_record import PRRecord
+
+
+@contextmanager
+def _get_file_buffer(file_target: Union[str, BinaryIO]) -> Iterator[BinaryIO]:
+    """
+    Gerencia o contexto de buffers de arquivo isolando operações de I/O.
+
+    Suporta tanto caminhos de arquivos físicos locais quanto buffers alocados
+    em memória, delegando o controle de ciclo de vida do recurso de forma
+    agnóstica à interface de chamada.
+
+    Args:
+        file_target: Caminho do arquivo físico (str) ou buffer binário em memória.
+
+    Yields:
+        Um iterador contendo o buffer binário aberto pronto para leitura.
+    """
+    if isinstance(file_target, str):
+        with open(file_target, "rb") as f:
+            yield f
+    else:
+        yield file_target
+
+
+def read_header_lazily(file_target: Union[str, BinaryIO]) -> tuple[str, ...]:
+    """
+    Lê a primeira linha de um arquivo CSV sob demanda para extração do cabeçalho.
+
+    Consome estritamente os bytes necessários para identificar as colunas,
+    garantindo eficiência de memória. Em buffers mutáveis em memória, o ponteiro
+    de leitura é redefinido para a posição inicial após a extração, garantindo
+    integridade para consumos futuros.
+
+    Args:
+        file_target: Caminho do arquivo físico ou buffer binário em memória.
+
+    Returns:
+        Tupla imutável contendo os nomes das colunas identificadas no cabeçalho.
+        Retorna uma tupla vazia em caso de falha de decodificação ou arquivo vazio.
+    """
+    with _get_file_buffer(file_target) as file_buffer:
+        try:
+            first_line_bytes = file_buffer.readline()
+            if not first_line_bytes:
+                return ()
+
+            first_line = first_line_bytes.decode("utf-8", errors="replace")
+            header = tuple(next(csv.reader([first_line])))
+        except (StopIteration, UnicodeDecodeError):
+            header = ()
+        finally:
+            if not isinstance(file_target, str):
+                file_buffer.seek(0)
+
+    return header
+
+
+def stream_csv(
+    file_target: Union[str, BinaryIO], 
+    hasher: Any = None
+) -> Iterator[PRRecord]:
+    """
+    Itera sobre um arquivo CSV de forma lazy produzindo instâncias de PRRecord.
+
+    Implementa decodificação sob demanda acoplada ao cálculo simultâneo
+    do hash SHA-256, garantindo o processamento completo e a assinatura
+    digital do arquivo em uma única passagem de I/O.
+
+    Args:
+        file_target: Caminho do arquivo físico ou buffer binário em memória.
+        hasher: Instância opcional de `hashlib.sha256` para acúmulo do hash
+            durante o percurso dos bytes brutos.
+
+    Yields:
+        Instâncias brutas de `PRRecord` mapeadas a partir das linhas do CSV.
+    """
+    if hasher is None:
+        hasher = hashlib.sha256()
+
+    with _get_file_buffer(file_target) as file_buffer:
+        def lazy_decoder_and_hasher() -> Iterator[str]:
+            for line_bytes in file_buffer:
+                hasher.update(line_bytes)
+                yield line_bytes.decode("utf-8", errors="replace")
+
+        reader = csv.DictReader(lazy_decoder_and_hasher())
+        
+        for row in reader:
+            yield PRRecord(**row)
+
+
+def stream_json(
+    file_target: Union[str, BinaryIO], 
+    hasher: Any = None
+) -> Iterator[PRRecord]:
+    """
+    Itera sobre um arquivo JSON Lines de forma lazy produzindo PRRecords.
+
+    O processo de decodificação converte bytes diretamente para dicionários
+    enquanto acumula o hash SHA-256 do arquivo original simultaneamente,
+    ignorando linhas estruturalmente vazias durante a varredura.
+
+    Args:
+        file_target: Caminho do arquivo físico ou buffer binário em memória.
+        hasher: Instância opcional de `hashlib.sha256` para acúmulo do hash
+            durante o percurso dos bytes brutos.
+
+    Yields:
+        Instâncias brutas de `PRRecord` mapeadas a partir das linhas JSON.
+    """
+    if hasher is None:
+        hasher = hashlib.sha256()
+
+    with _get_file_buffer(file_target) as file_buffer:
+        for line_bytes in file_buffer:
+            hasher.update(line_bytes)
+            
+            if not line_bytes.strip():
+                continue
+                
+            row_data = json.loads(line_bytes.decode("utf-8", errors="replace"))
+            yield PRRecord(**row_data)
