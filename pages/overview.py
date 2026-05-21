@@ -38,8 +38,7 @@ def _count_total_records(
     records: Iterable[Any],
 ) -> int:
     """
-    Conta total de registros utilizando reduce()
-    para manter aderência funcional ao projeto.
+    Conta total de registros utilizando reduce().
     """
 
     return reduce(
@@ -49,34 +48,10 @@ def _count_total_records(
     )
 
 
-def render_overview(
-    records: Iterable[Any],
-) -> None:
+def render_header() -> None:
     """
-    Renderiza dashboard principal de overview.
-
-    Args:
-        records:
-            Coleção de AnalysisResult já processados.
+    Renderiza cabeçalho principal.
     """
-
-    # =====================================
-    # Evita consumo múltiplo de generators
-    # durante agregações independentes.
-
-    cached_records = tuple(records)
-
-    # =====================================
-    # AGREGAÇÕES FUNCIONAIS
-    # =====================================
-
-    language_data = count_by_language(cached_records)
-
-    project_type_data = count_by_project_type(cached_records)
-
-    pr_nature_data = count_by_pr_nature(cached_records)
-
-    total_records = _count_total_records(cached_records)
 
     st.title("Overview de Pull Requests")
 
@@ -86,6 +61,16 @@ def render_overview(
         """)
 
     st.divider()
+
+
+def render_kpis(
+    total_records: int,
+    language_data: dict,
+    project_type_data: dict,
+) -> None:
+    """
+    Renderiza KPIs principais.
+    """
 
     kpi_col1, kpi_col2, kpi_col3 = st.columns(3)
 
@@ -112,35 +97,97 @@ def render_overview(
 
     st.divider()
 
+
+def render_main_charts(
+    language_data: dict,
+    project_type_data: dict,
+    pr_nature_data: dict,
+) -> None:
+    """
+    Renderiza gráficos principais do dashboard.
+    """
+
     col1, col2 = st.columns(2)
 
     with col1:
 
-        st.plotly_chart(
-            bar_chart_by_category(
-                language_data,
-                title="PRs por Linguagem",
-                x_title="Linguagem",
-            ),
-            use_container_width=True,
-        )
+        with st.container(border=True):
+
+            st.plotly_chart(
+                bar_chart_by_category(
+                    language_data,
+                    title="PRs por Linguagem",
+                    x_title="Linguagem",
+                ),
+                use_container_width=True,
+            )
 
     with col2:
 
+        with st.container(border=True):
+
+            st.plotly_chart(
+                bar_chart_by_category(
+                    project_type_data,
+                    title="PRs por Tipo de Projeto",
+                    x_title="Tipo de Projeto",
+                ),
+                use_container_width=True,
+            )
+
+    st.write("")
+
+    with st.container(border=True):
+
         st.plotly_chart(
             bar_chart_by_category(
-                project_type_data,
-                title="PRs por Tipo de Projeto",
-                x_title="Tipo de Projeto",
+                pr_nature_data,
+                title="PRs por Natureza da Contribuição",
+                x_title="Natureza",
             ),
             use_container_width=True,
         )
 
-    st.plotly_chart(
-        bar_chart_by_category(
-            pr_nature_data,
-            title="PRs por Natureza da Contribuição",
-            x_title="Natureza",
-        ),
-        use_container_width=True,
+
+def render_footer() -> None:
+    """
+    Renderiza rodapé do dashboard.
+    """
+
+    st.divider()
+
+    st.caption("RP3 • Functional Dashboard • Streamlit")
+
+
+def render_overview(
+    records: Iterable[Any],
+) -> None:
+    """
+    Renderiza dashboard principal de overview.
+    """
+
+    cached_records = tuple(records)
+
+    language_data = count_by_language(cached_records)
+
+    project_type_data = count_by_project_type(cached_records)
+
+    pr_nature_data = count_by_pr_nature(cached_records)
+
+    total_records = _count_total_records(cached_records)
+
+    render_header()
+
+    render_kpis(
+        total_records,
+        language_data,
+        project_type_data,
     )
+
+    render_main_charts(
+        language_data,
+        project_type_data,
+        pr_nature_data,
+    )
+
+    render_footer()

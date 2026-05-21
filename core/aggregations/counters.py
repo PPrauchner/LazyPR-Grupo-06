@@ -133,4 +133,14 @@ def count_by_pr_nature(
         records,
         lambda record: record.pr_nature,
     )
-"""
+def count_by_clarity(
+    records: Iterable[Any],
+) -> Mapping[str, int]:
+    """
+    Conta PRs agrupados por nível de clareza.
+    """
+
+    return count_by(
+        records,
+        lambda record: record.clarity_level,
+    )
