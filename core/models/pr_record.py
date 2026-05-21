@@ -28,7 +28,6 @@ from typing import NamedTuple
 
 
 class PRRecord(NamedTuple):
-<<<<<<< Rafael
     """
     Registro bruto produzido pela etapa de ingestao.
 
@@ -45,26 +44,6 @@ class PRRecord(NamedTuple):
         line: Linha do arquivo relacionada ao comentario.
         language: Linguagem inferida quando disponivel; caso contrario, None.
         created_at: Data de criacao quando disponivel; caso contrario, None.
-=======
-    """Registro imutável de um PR bruto do dataset Kaggle.
-
-    Representa um comentário de pull request com todos os campos
-    originais do dataset antes de enriquecimento semântico.
-
-    Attributes:
-        id: Identificador único do comentário.
-        html_url: URL completa do comentário no GitHub.
-        repo: Repositório no formato "owner/repo".
-        path: Arquivo comentado (ex: "src/main.py").
-        body: Texto completo do comentário.
-        diff_hunk: Trecho do diff associado.
-        author: Login do autor do comentário.
-        author_association: Relação com repo ("OWNER", "MEMBER", "CONTRIBUTOR", etc).
-        commit_id: ID do commit referenciado.
-        line: Número da linha comentada.
-        language: Linguagem principal do arquivo (None se indeterminada).
-        created_at: Data de criação no ISO format (None se ausente).
->>>>>>> Development
     """
 
     id: int
@@ -77,10 +56,5 @@ class PRRecord(NamedTuple):
     author_association: str
     commit_id: str
     line: int
-<<<<<<< Rafael
     language: str | None
     created_at: str | None
-=======
-    language: str | None = None
-    created_at: str | None = None
->>>>>>> Development
