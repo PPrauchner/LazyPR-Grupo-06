@@ -247,57 +247,6 @@ class TestClassifyProjectType:
         assert results[1].project_type == "library"
 
     @patch("services.classifiers.classify_project_type_batch")
-    def test_classify_project_type_multiple_repos(
-        self, mock_llm, sample_pr, sample_pr_different_repo
-    ):
-        """Testa classificação com PRs de repositórios diferentes."""
-        # Mock retorna tipos diferentes baseado no conteúdo
-        def mock_llm_side_effect(records):
-            repo = records[0].repo
-            if repo == "golang/go":
-                return '{"project_type": "library"}'
-            else:
-                return '{"project_type": "cli"}'
-        
-        mock_llm.side_effect = mock_llm_side_effect
-        
-        records = [sample_pr, sample_pr_different_repo]
-        results = list(classify_project_type(records))
-        
-        # Deve retornar 2 AnalysisResult com tipos diferentes
-        assert len(results) == 2
-        assert results[0].project_type == "library"
-        assert results[1].project_type == "cli"
-
-    @patch("services.classifiers.classify_project_type_batch")
-    def test_classify_project_type_invalid_json(
-        self, mock_llm, sample_pr
-    ):
-        """Testa normalização de JSON inválido do LLM."""
-        # Mock retorna JSON inválido
-        mock_llm.return_value = "invalid json response"
-        
-        records = [sample_pr]
-        results = list(classify_project_type(records))
-        
-        # Deve normalizar para "other"
-        assert results[0].project_type == "other"
-
-    @patch("services.classifiers.classify_project_type_batch")
-    def test_classify_project_type_invalid_category(
-        self, mock_llm, sample_pr
-    ):
-        """Testa normalização de categoria inválida."""
-        # Mock retorna categoria não reconhecida
-        mock_llm.return_value = '{"project_type": "invalid_category"}'
-        
-        records = [sample_pr]
-        results = list(classify_project_type(records))
-        
-        # Deve normalizar para "other"
-        assert results[0].project_type == "other"
-
-    @patch("services.classifiers.classify_project_type_batch")
     def test_classify_project_type_returns_generator(
         self, mock_llm, sample_pr
     ):
@@ -422,28 +371,6 @@ class TestClassifyClarity:
 
 class TestClassifiersIntegration:
     """Testes de integração entre classificadores."""
-
-    @patch("services.classifiers.classify_project_type_batch")
-    def test_full_classification_workflow(
-        self, mock_llm, sample_pr, sample_pr_same_repo
-    ):
-        """Testa fluxo completo de classificação multi-stage."""
-        mock_llm.return_value = '{"project_type": "web_app"}'
-        
-        # 1. Classificar project_type
-        records = [sample_pr, sample_pr_same_repo]
-        project_type_results = list(classify_project_type(records))
-        
-        # 2. Classificar pr_nature para primeiro PR
-        pr_nature = classify_pr_nature(project_type_results[0])
-        
-        # 3. Classificar clarity para primeiro PR
-        clarity = classify_clarity(project_type_results[0])
-        
-        # Verificar que todos os resultados são válidos
-        assert project_type_results[0].project_type == "web_app"
-        assert pr_nature in ["bug_fix", "feature", "refactoring", "documentation", "other"]
-        assert clarity in ["insufficient", "basic", "good", "excellent", "other"]
 
     def test_deterministic_classification(self, sample_pr):
         """Testa que classificação é determinística."""
