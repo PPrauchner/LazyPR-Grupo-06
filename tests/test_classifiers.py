@@ -24,7 +24,6 @@ from services.classifiers import (
 )
 from utils.memoization import clear_cache
 
-
 # ---------------------------------------------------------------------------
 # Fixtures
 # ---------------------------------------------------------------------------
@@ -156,7 +155,7 @@ class TestBuildAnalysisResult:
             pr_nature="bug_fix",
             clarity_level="good",
         )
-        
+
         assert result.id == sample_pr.id
         assert result.repo == sample_pr.repo
         assert result.project_type == "library"
@@ -181,14 +180,14 @@ class TestBuildAnalysisResult:
             language="python",
             created_at=None,
         )
-        
+
         result = _build_analysis_result(
             record=pr,
             project_type="library",
             pr_nature="feature",
             clarity_level="excellent",
         )
-        
+
         assert result.char_count == 16
         assert result.word_count == 3
 
@@ -235,27 +234,25 @@ class TestClassifyProjectType:
         """Testa classificação com PRs do mesmo repositório."""
         # Mock retorna JSON válido
         mock_llm.return_value = '{"project_type": "library"}'
-        
+
         records = [sample_pr, sample_pr_same_repo]
         results = list(classify_project_type(records))
-        
+
         # Deve retornar 2 AnalysisResult
         assert len(results) == 2
-        
+
         # Ambos devem ter mesmo project_type (batching)
         assert results[0].project_type == "library"
         assert results[1].project_type == "library"
 
     @patch("services.classifiers.classify_project_type_batch")
-    def test_classify_project_type_returns_generator(
-        self, mock_llm, sample_pr
-    ):
+    def test_classify_project_type_returns_generator(self, mock_llm, sample_pr):
         """Testa que classify_project_type retorna generator (lazy)."""
         mock_llm.return_value = '{"project_type": "library"}'
-        
+
         records = [sample_pr]
         result_gen = classify_project_type(records)
-        
+
         # Deve ser generator, não lista
         assert hasattr(result_gen, "__iter__")
         assert hasattr(result_gen, "__next__")
@@ -265,7 +262,7 @@ class TestClassifyProjectType:
         """Testa classificação com lista vazia."""
         records = []
         results = list(classify_project_type(records))
-        
+
         # Deve retornar lista vazia
         assert len(results) == 0
 
@@ -281,7 +278,7 @@ class TestClassifyPRNature:
     def test_classify_pr_nature_returns_valid_label(self, sample_pr):
         """Testa que classify_pr_nature retorna label válido."""
         result = classify_pr_nature(sample_pr)
-        
+
         # Implementação atual retorna "other" por padrão
         assert result in ["bug_fix", "feature", "refactoring", "documentation", "other"]
 
@@ -290,28 +287,46 @@ class TestClassifyPRNature:
         # Duas chamadas com mesmo PR devem usar cache
         result1 = classify_pr_nature(sample_pr)
         result2 = classify_pr_nature(sample_pr)
-        
+
         # Deve retornar mesmo valor (cache hit)
         assert result1 == result2
 
     def test_classify_pr_nature_different_bodies(self):
         """Testa que diferentes bodies geram diferentes hashes."""
         pr1 = PRRecord(
-            id=1, html_url="url1", repo="test/repo", path="file.py",
-            body="Fix bug", diff_hunk="@@", author="user", author_association="CON",
-            commit_id="abc", line=1, language="python", created_at=None,
+            id=1,
+            html_url="url1",
+            repo="test/repo",
+            path="file.py",
+            body="Fix bug",
+            diff_hunk="@@",
+            author="user",
+            author_association="CON",
+            commit_id="abc",
+            line=1,
+            language="python",
+            created_at=None,
         )
-        
+
         pr2 = PRRecord(
-            id=2, html_url="url2", repo="test/repo", path="file.py",
-            body="Add feature", diff_hunk="@@", author="user", author_association="CON",
-            commit_id="def", line=1, language="python", created_at=None,
+            id=2,
+            html_url="url2",
+            repo="test/repo",
+            path="file.py",
+            body="Add feature",
+            diff_hunk="@@",
+            author="user",
+            author_association="CON",
+            commit_id="def",
+            line=1,
+            language="python",
+            created_at=None,
         )
-        
+
         # Ambas devem retornar string válida
         result1 = classify_pr_nature(pr1)
         result2 = classify_pr_nature(pr2)
-        
+
         assert isinstance(result1, str)
         assert isinstance(result2, str)
 
@@ -327,7 +342,7 @@ class TestClassifyClarity:
     def test_classify_clarity_returns_valid_label(self, sample_pr):
         """Testa que classify_clarity retorna label válido."""
         result = classify_clarity(sample_pr)
-        
+
         # Implementação atual retorna "other" por padrão
         assert result in ["insufficient", "basic", "good", "excellent", "other"]
 
@@ -336,30 +351,46 @@ class TestClassifyClarity:
         # Duas chamadas com mesmo body devem usar cache
         result1 = classify_clarity(sample_pr)
         result2 = classify_clarity(sample_pr)
-        
+
         # Deve retornar mesmo valor (cache hit)
         assert result1 == result2
 
     def test_classify_clarity_different_bodies(self):
         """Testa que diferentes bodies geram diferentes hashes."""
         pr1 = PRRecord(
-            id=1, html_url="url1", repo="test/repo", path="file.py",
-            body="Clear and detailed description", diff_hunk="@@",
-            author="user", author_association="CON",
-            commit_id="abc", line=1, language="python", created_at=None,
+            id=1,
+            html_url="url1",
+            repo="test/repo",
+            path="file.py",
+            body="Clear and detailed description",
+            diff_hunk="@@",
+            author="user",
+            author_association="CON",
+            commit_id="abc",
+            line=1,
+            language="python",
+            created_at=None,
         )
-        
+
         pr2 = PRRecord(
-            id=2, html_url="url2", repo="test/repo", path="file.py",
-            body="xyz", diff_hunk="@@",
-            author="user", author_association="CON",
-            commit_id="def", line=1, language="python", created_at=None,
+            id=2,
+            html_url="url2",
+            repo="test/repo",
+            path="file.py",
+            body="xyz",
+            diff_hunk="@@",
+            author="user",
+            author_association="CON",
+            commit_id="def",
+            line=1,
+            language="python",
+            created_at=None,
         )
-        
+
         # Ambas devem retornar string válida
         result1 = classify_clarity(pr1)
         result2 = classify_clarity(pr2)
-        
+
         assert isinstance(result1, str)
         assert isinstance(result2, str)
 
@@ -378,5 +409,5 @@ class TestClassifiersIntegration:
         result1 = classify_pr_nature(sample_pr)
         result2 = classify_pr_nature(sample_pr)
         result3 = classify_pr_nature(sample_pr)
-        
+
         assert result1 == result2 == result3
