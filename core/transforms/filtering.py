@@ -28,9 +28,8 @@ Relacionado a:
     - Regra Funcional 07 (filter(), lambda)
     - Conceito-Chave 07 (lambda para filtros inline)
 """
-
-<<<<<<< Rafael
-from collections.abc import Callable
+from collections.abc import Callable, Iterable
+from functools import reduce
 
 from core.models.analysis_result import AnalysisResult
 
@@ -76,7 +75,7 @@ def by_project_type(project_types: tuple[str, ...]) -> Predicate:
 def by_pr_nature(pr_natures: tuple[str, ...]) -> Predicate:
     """
     Cria um predicado para filtrar registros por natureza da contribuição.
-
+    
     Os valores devem corresponder ao campo pr_nature definido em AnalysisResult,
     como "bug_fix", "feature", "refactoring", "documentation" e "other".
 
@@ -110,61 +109,55 @@ def by_clarity_level(clarity_levels: tuple[str, ...]) -> Predicate:
     return lambda record: record.clarity_level.lower() in allowed
 
 
-def build_filter(*predicates: Predicate) -> Predicate:
+def compose_predicates(predicates: Iterable[Predicate]) -> Predicate:
     """
-    Compõe múltiplos predicados em uma única função de filtro.
+    Constrói uma nova função pura combinando múltiplos predicados via conjunção lógica (AND).
 
-    A composição usa conjunção lógica: um registro só passa se todos os
-    predicados ativos retornarem True. Quando nenhum predicado é informado,
-    all() retorna True, permitindo que todos os registros passem.
+    Utiliza `reduce()` para aplicar a composição funcional de forma imutável,
+    agrupando os filtros passo a passo sem modificar ou mutar as funções originais.
+    Se a lista de predicados estiver vazia, retorna uma função identidade que
+    permite a passagem de todos os registros.
 
     Args:
-        *predicates: Predicados individuais criados a partir dos filtros
-            selecionados na interface.
+        predicates: Iterável contendo as funções de filtragem (Predicate)
+            que serão combinadas na validação.
 
     Returns:
-        Função que recebe um AnalysisResult e retorna True quando o registro
-        satisfizer todos os critérios ativos.
+        Uma única função do tipo Predicate que aceita um registro (AnalysisResult)
+        e retorna True se, e somente se, todas as condições originais
+        forem satisfeitas.
     """
-    return lambda record: all(predicate(record) for predicate in predicates)
-=======
-from typing import Callable, Any
+    predicate_tuple: tuple[Predicate, ...] = tuple(predicates)
 
-# Definindo o tipo Predicate: uma função que recebe um registro e retorna booleano
-Predicate = Callable[[Any], bool]
+    if not predicate_tuple:
+        return lambda _: True
 
-def is_language(target_language: str) -> Predicate:
-    """Retorna um predicado puro que verifica a linguagem."""
-    return lambda record: getattr(record, 'language', '').lower() == target_language.lower()
+    return reduce(
+        lambda accumulated, current: (
+            lambda record: accumulated(record) and current(record)
+        ),
+        predicate_tuple,
+    )
 
-def has_project_type(target_type: str) -> Predicate:
-    """Retorna um predicado puro que verifica o tipo de projeto (pós-LLM)."""
-    return lambda record: getattr(record, 'project_type', '') == target_type
 
-def has_pr_nature(target_nature: str) -> Predicate:
-    """Retorna um predicado puro que verifica a natureza da contribuição (pós-LLM)."""
-    return lambda record: getattr(record, 'pr_nature', '') == target_nature
-
-def has_clarity_level(target_level: str) -> Predicate:
-    """Retorna um predicado puro que verifica o nível de clareza da descrição (pós-LLM)."""
-    return lambda record: getattr(record, 'clarity_level', '') == target_level
-
-def is_in_date_range(start_date: str, end_date: str) -> Predicate:
+def apply_filters(
+    predicates: Iterable[Predicate],
+    records: Iterable[AnalysisResult],
+) -> filter:
     """
-    Retorna um predicado puro que verifica se a data do PR está no intervalo.
-    Assume que 'created_at' está num formato string comparável (ex: ISO 8601 YYYY-MM-DD).
-    """
-    return lambda record: start_date <= getattr(record, 'created_at', '')[:10] <= end_date
+    Aplica um pipeline de filtros encadeados a um stream de registros utilizando avaliação preguiçosa (lazy evaluation).
 
-def build_filter(*predicates: Predicate) -> Predicate:
+    Encapsula a composição e a filtragem em uma única operação puramente funcional.
+    A utilização de `filter()` garante que os registros não sejam materializados em memória
+    (evitando `list()`), processando o dataset iterativamente sob demanda.
+
+    Args:
+        predicates: Iterável com as condições de filtragem a serem compostas e aplicadas.
+        records: Stream lazy (gerador ou iterável) de registros (AnalysisResult)
+            a serem validados.
+
+    Returns:
+        Um iterador preguiçoso (objeto `filter`) que cede exclusivamente os
+        registros que satisfazem todos os critérios da composição lógica.
     """
-    Compõe múltiplos predicados em uma única função de filtro via conjunção lógica (AND).
-    Utiliza avaliação preguiçosa e conceitos de programação funcional (sem laços de repetição).
-    """
-    if not predicates:
-        return lambda _: True  # Identidade: sem filtros, permite a passagem de todos
-    
-    # map() aplica a avaliação de cada predicado ao registro atual
-    # all() garante que o registro só passa se TODOS os predicados retornarem True
-    return lambda record: all(map(lambda p: p(record), predicates))
->>>>>>> Development
+    return filter(compose_predicates(predicates), records)

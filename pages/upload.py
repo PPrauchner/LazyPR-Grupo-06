@@ -13,55 +13,67 @@ Responsabilidades:
 - Disparo do processo de classificação e enriquecimento
 - Persistência do hash da análise para cache posterior
 """
-
 import streamlit as st
+from streamlit.runtime.uploaded_file_manager import UploadedFile
+from core.transforms.cleaning import get_missing_columns
+from services.ingestion import read_header_lazily
 
-from ui.components import (
-    status_banner,
-)
 
-
-def render_upload_page() -> None:
+def _validate_schema(uploaded_file: UploadedFile) -> bool:
     """
-    Renderiza página de upload.
+    Valida o schema do dataset e exibe o feedback visual correspondente.
+
+    Consome a estrutura de cabeçalho obtida de forma lazy pela camada de 
+    ingestão e delega a verificação de conformidade de colunas para uma 
+    função pura de transformação, isolando efeitos colaterais de I/O 
+    da renderização de erros na interface.
+
+    Args:
+        uploaded_file: Objeto de arquivo binário interceptado pelo Streamlit.
+
+    Returns:
+        bool: True se o schema for estritamente válido e contiver todas as 
+        colunas obrigatórias; False caso contrário.
     """
+    header = read_header_lazily(uploaded_file)
 
-    st.title("Upload de Dataset")
+    if not header:
+        st.error("O arquivo enviado está vazio ou é inválido.")
+        return False
 
-    st.markdown("""
-        Faça upload do dataset contendo
-        Pull Requests para análise.
-        """)
+    missing = get_missing_columns(header)
+    if missing:
+        st.error(f"Faltam colunas obrigatórias: **{', '.join(missing)}**")
+        return False
 
-    st.divider()
+    return True
 
-    with st.container(border=True):
 
-        uploaded_file = st.file_uploader(
-            "Selecione um arquivo CSV",
-            type=("csv", "json"),
-        )
+def render() -> None:
+    """
+    Renderiza os componentes visuais da página e gerencia o estado do fluxo.
 
-        if uploaded_file:
+    Disponibiliza o seletor de arquivos, aciona a esteira de validação de
+    schema e intercepta o fluxo em caso de falha estrutural. Havendo sucesso,
+    estabiliza o ponteiro do arquivo no escopo de sessão para permitir
+    a avaliação lazy nas etapas subsequentes do pipeline.
+    """
+    st.title("📂 Carregar Dataset")
 
-            status_banner(
-                "Dataset carregado com sucesso.",
-                "success",
-            )
+    uploaded_file = st.file_uploader("Selecione o arquivo CSV", type=["csv"])
 
-            st.session_state["uploaded_dataset"] = uploaded_file
+    if uploaded_file is None:
+        st.info("Aguardando upload...")
+        return
 
-            st.write("")
+    if not _validate_schema(uploaded_file):
+        st.stop()
 
-            st.caption(f"Arquivo selecionado: " f"{uploaded_file.name}")
+    st.success("Schema validado! O arquivo está pronto para o processamento.")
 
-        else:
+    if st.button("Iniciar Análise 🚀"):
+        st.session_state["dataset_file"] = uploaded_file
+        st.switch_page("pages/correlations.py")
 
-            status_banner(
-                "Nenhum dataset carregado.",
-                "warning",
-            )
 
-    st.divider()
-
-    st.caption("Upload visual • Streamlit UI")
+render()
