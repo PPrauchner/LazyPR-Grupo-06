@@ -28,8 +28,8 @@ Relacionado a:
     - Regra Funcional 07 (filter(), lambda)
     - Conceito-Chave 07 (lambda para filtros inline)
 """
-
-from collections.abc import Callable
+from collections.abc import Callable, Iterable
+from functools import reduce
 
 from core.models.analysis_result import AnalysisResult
 
@@ -75,7 +75,7 @@ def by_project_type(project_types: tuple[str, ...]) -> Predicate:
 def by_pr_nature(pr_natures: tuple[str, ...]) -> Predicate:
     """
     Cria um predicado para filtrar registros por natureza da contribuição.
-
+    
     Os valores devem corresponder ao campo pr_nature definido em AnalysisResult,
     como "bug_fix", "feature", "refactoring", "documentation" e "other".
 
@@ -109,20 +109,55 @@ def by_clarity_level(clarity_levels: tuple[str, ...]) -> Predicate:
     return lambda record: record.clarity_level.lower() in allowed
 
 
-def build_filter(*predicates: Predicate) -> Predicate:
+def compose_predicates(predicates: Iterable[Predicate]) -> Predicate:
     """
-    Compõe múltiplos predicados em uma única função de filtro.
+    Constrói uma nova função pura combinando múltiplos predicados via conjunção lógica (AND).
 
-    A composição usa conjunção lógica: um registro só passa se todos os
-    predicados ativos retornarem True. Quando nenhum predicado é informado,
-    all() retorna True, permitindo que todos os registros passem.
+    Utiliza `reduce()` para aplicar a composição funcional de forma imutável,
+    agrupando os filtros passo a passo sem modificar ou mutar as funções originais.
+    Se a lista de predicados estiver vazia, retorna uma função identidade que
+    permite a passagem de todos os registros.
 
     Args:
-        *predicates: Predicados individuais criados a partir dos filtros
-            selecionados na interface.
+        predicates: Iterável contendo as funções de filtragem (Predicate)
+            que serão combinadas na validação.
 
     Returns:
-        Função que recebe um AnalysisResult e retorna True quando o registro
-        satisfizer todos os critérios ativos.
+        Uma única função do tipo Predicate que aceita um registro (AnalysisResult)
+        e retorna True se, e somente se, todas as condições originais
+        forem satisfeitas.
     """
-    return lambda record: all(predicate(record) for predicate in predicates)
+    predicate_tuple: tuple[Predicate, ...] = tuple(predicates)
+
+    if not predicate_tuple:
+        return lambda _: True
+
+    return reduce(
+        lambda accumulated, current: (
+            lambda record: accumulated(record) and current(record)
+        ),
+        predicate_tuple,
+    )
+
+
+def apply_filters(
+    predicates: Iterable[Predicate],
+    records: Iterable[AnalysisResult],
+) -> filter:
+    """
+    Aplica um pipeline de filtros encadeados a um stream de registros utilizando avaliação preguiçosa (lazy evaluation).
+
+    Encapsula a composição e a filtragem em uma única operação puramente funcional.
+    A utilização de `filter()` garante que os registros não sejam materializados em memória
+    (evitando `list()`), processando o dataset iterativamente sob demanda.
+
+    Args:
+        predicates: Iterável com as condições de filtragem a serem compostas e aplicadas.
+        records: Stream lazy (gerador ou iterável) de registros (AnalysisResult)
+            a serem validados.
+
+    Returns:
+        Um iterador preguiçoso (objeto `filter`) que cede exclusivamente os
+        registros que satisfazem todos os critérios da composição lógica.
+    """
+    return filter(compose_predicates(predicates), records)
