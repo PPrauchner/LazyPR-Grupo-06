@@ -23,6 +23,12 @@ from typing import Iterable, Any
 
 import streamlit as st
 
+from core.aggregations.metrics import (
+    char_distribution,
+    description_stats,
+    word_distribution,
+)
+
 from core.aggregations.counters import (
     count_by_language,
     count_by_project_type,
@@ -31,6 +37,7 @@ from core.aggregations.counters import (
 
 from ui.charts import (
     bar_chart_by_category,
+    distribution_chart_from_bins,
 )
 
 
@@ -149,6 +156,67 @@ def render_main_charts(
         )
 
 
+def render_description_distributions(
+    records: Iterable[Any],
+) -> None:
+    """
+    Renderiza distribuições estatísticas
+    de tamanho de descrição.
+    """
+
+    stats = description_stats(records)
+
+    char_data = char_distribution(records)
+
+    word_data = word_distribution(records)
+
+    st.divider()
+
+    st.subheader("Distribuição de Tamanho de Descrição")
+
+    metric_col1, metric_col2 = st.columns(2)
+
+    with metric_col1:
+
+        st.metric(
+            "Média de Caracteres",
+            stats["char"]["mean"],
+        )
+
+    with metric_col2:
+
+        st.metric(
+            "Média de Palavras",
+            stats["word"]["mean"],
+        )
+
+    chart_col1, chart_col2 = st.columns(2)
+
+    with chart_col1:
+
+        with st.container(border=True):
+
+            st.plotly_chart(
+                distribution_chart_from_bins(
+                    char_data,
+                    dimension="char_count",
+                ),
+                use_container_width=True,
+            )
+
+    with chart_col2:
+
+        with st.container(border=True):
+
+            st.plotly_chart(
+                distribution_chart_from_bins(
+                    word_data,
+                    dimension="word_count",
+                ),
+                use_container_width=True,
+            )
+
+
 def render_footer() -> None:
     """
     Renderiza rodapé do dashboard.
@@ -188,6 +256,10 @@ def render_overview(
         language_data,
         project_type_data,
         pr_nature_data,
+    )
+
+    render_description_distributions(
+        cached_records,
     )
 
     render_footer()
