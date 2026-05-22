@@ -22,7 +22,7 @@ from pages.overview import (
     render_overview,
 )
 
-from pages.correlation_dashboard import (
+from pages.correlations_dashboard import (
     render_correlation_dashboard,
 )
 
