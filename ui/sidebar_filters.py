@@ -18,12 +18,13 @@ import streamlit as st
 
 from core.transforms.filtering import (
     Predicate,
-    build_filter,
-    has_clarity_level,
-    has_pr_nature,
-    has_project_type,
+    apply_filters,
+    by_clarity_level,
+    by_language,
+    by_pr_nature,
+    by_project_type,
+    compose_predicates,
     is_in_date_range,
-    is_language,
 )
 
 LANGUAGES = (
@@ -107,28 +108,28 @@ def get_active_filters() -> Predicate:
 
     active_predicates.extend(
         map(
-            is_language,
+            lambda language: by_language((language,)),
             selected_languages,
         )
     )
 
     active_predicates.extend(
         map(
-            has_project_type,
+            lambda project_type: by_project_type((project_type,)),
             selected_project_types,
         )
     )
 
     active_predicates.extend(
         map(
-            has_pr_nature,
+            lambda pr_nature: by_pr_nature((pr_nature,)),
             selected_natures,
         )
     )
 
     active_predicates.extend(
         map(
-            has_clarity_level,
+            lambda clarity: by_clarity_level((clarity,)),
             selected_clarity,
         )
     )
@@ -142,8 +143,8 @@ def get_active_filters() -> Predicate:
             )
         )
 
-    return build_filter(
-        *active_predicates,
+    return compose_predicates(
+        active_predicates,
     )
 
 
