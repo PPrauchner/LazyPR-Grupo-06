@@ -40,6 +40,14 @@ from ui.charts import (
     distribution_chart_from_bins,
 )
 
+from core.transforms.filtering import (
+    apply_filters,
+)
+
+from ui.sidebar_filters import (
+    get_active_filters,
+)
+
 
 def _count_total_records(
     records: Iterable[Any],
@@ -234,15 +242,22 @@ def render_overview(
     Renderiza dashboard principal de overview.
     """
 
-    cached_records = tuple(records)
+    active_filter = get_active_filters()
 
-    language_data = count_by_language(cached_records)
+    filtered_records = tuple(
+        apply_filters(
+            (active_filter,),
+            records,
+        )
+    )
 
-    project_type_data = count_by_project_type(cached_records)
+    language_data = count_by_language(filtered_records)
 
-    pr_nature_data = count_by_pr_nature(cached_records)
+    project_type_data = count_by_project_type(filtered_records)
 
-    total_records = _count_total_records(cached_records)
+    pr_nature_data = count_by_pr_nature(filtered_records)
+
+    total_records = _count_total_records(filtered_records)
 
     render_header()
 
@@ -259,7 +274,7 @@ def render_overview(
     )
 
     render_description_distributions(
-        cached_records,
+        filtered_records,
     )
 
     render_footer()
