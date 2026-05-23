@@ -31,7 +31,7 @@ Relacionado a:
 from __future__ import annotations
 from dataclasses import dataclass
 from datetime import date, datetime, timezone
-from core.transforms.cleaning import CleanPRRecord
+from core.transforms.cleaning import PRRecord
 from typing import NamedTuple
 
 _LANGUAGE_MAP: dict[str, str] = {
@@ -87,7 +87,7 @@ _LABEL_MAP: dict[str, str] = {
 
 @dataclass(frozen=True)
 class NormalizedPRRecord:
-    """CleanPRRecord com campos normalizados e métricas derivadas."""
+    """PRRecord com campos normalizados e métricas derivadas."""
 
     title: str
     body: str
@@ -157,9 +157,9 @@ def compute_word_count(text: str) -> int:
 
 
 # Ponto de entrada público
-def normalize_pr_record(record: CleanPRRecord) -> NormalizedPRRecord:
+def normalize_pr_record(record: PRRecord) -> NormalizedPRRecord:
     """
-    Aplica todas as normalizações a um CleanPRRecord.
+    Aplica todas as normalizações a um PRRecord.
 
     Função pura: mesma entrada → sempre a mesma saída.
     Nenhum estado externo é lido ou modificado.
@@ -177,40 +177,41 @@ def normalize_pr_record(record: CleanPRRecord) -> NormalizedPRRecord:
         char_count=compute_char_count(record.body),
         word_count=compute_word_count(record.body),
     )
-    
+
+
 class TextMetrics(NamedTuple):
     """Immutable data structure for text physical dimensions."""
+
     char_count: int
     word_count: int
+
 
 def compute_text_metrics(body: str) -> TextMetrics:
     """
     Computes total characters and total words in a given text.
-    
+
     Pure function: depends entirely on input, does not mutate state.
     Utilizes built-in optimized methods instead of explicit loops.
-    
+
     Args:
         body (str): The PR body text.
-        
+
     Returns:
         TextMetrics: A named tuple containing character and word counts.
     """
     if not body:
         return TextMetrics(char_count=0, word_count=0)
-        
-    return TextMetrics(
-        char_count=len(body),
-        word_count=len(body.split())
-    )
 
-def normalize_pr_record(record: CleanPRRecord) -> NormalizedPRRecord:
+    return TextMetrics(char_count=len(body), word_count=len(body.split()))
+
+
+def normalize_pr_record(record: PRRecord) -> NormalizedPRRecord:
     """
-    Applies all normalizations to a CleanPRRecord.
+    Applies all normalizations to a PRRecord.
     Pure function: same input -> same output. No external state modified.
     """
     metrics = compute_text_metrics(record.body)
-    
+
     return NormalizedPRRecord(
         title=record.title,
         body=record.body,

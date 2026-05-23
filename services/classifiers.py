@@ -41,7 +41,7 @@ from dataclasses import dataclass
 from enum import Enum
 from typing import Iterable
 
-from core.transforms.cleaning import CleanPRRecord
+from core.models.pr_record import PRRecord
 
 # Interfaces (substituir pelas implementações reais quando fizer llm_client)
 
@@ -148,9 +148,9 @@ _PROMPTS = {
 }
 
 
-def classify_project_type(records: Iterable[CleanPRRecord]) -> list[ProjectTypeResult]:
+def classify_project_type(records: Iterable[PRRecord]) -> list[ProjectTypeResult]:
     """Agrupa PRs por repositório e faz uma única chamada ao LLM por grupo."""
-    groups: dict[str, list[CleanPRRecord]] = defaultdict(list)
+    groups: dict[str, list[PRRecord]] = defaultdict(list)
     for r in records:
         groups[r.repository].append(r)
 
@@ -169,7 +169,7 @@ def classify_project_type(records: Iterable[CleanPRRecord]) -> list[ProjectTypeR
     return results
 
 
-def classify_pr_nature(record: CleanPRRecord) -> PRNatureResult:
+def classify_pr_nature(record: PRRecord) -> PRNatureResult:
     """Classifica a natureza do PR
     Sendo eles: bug_fix, feature, refactoring e documentation."""
 
@@ -182,7 +182,7 @@ def classify_pr_nature(record: CleanPRRecord) -> PRNatureResult:
     return PRNatureResult(nature, raw)
 
 
-def classify_clarity(record: CleanPRRecord) -> ClarityResult:
+def classify_clarity(record: PRRecord) -> ClarityResult:
     """Avalia a clareza da descrição em quatro níveis."""
     prompt = f"{_PROMPTS['clarity']}\n\nTítulo: {record.title}\nDescrição:\n{record.body or '[sem descrição]'}"
     raw = _cached_call(f"clarity:{record.title}:{record.body[:200]}", prompt)
