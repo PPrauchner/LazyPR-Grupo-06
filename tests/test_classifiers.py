@@ -198,8 +198,11 @@ def test_clarity_level_scores():
     assert ClarityLevel.BASICA.score == 2
     assert ClarityLevel.BOA.score == 3
     assert ClarityLevel.EXCELENTE.score == 4
-Testes para services/classifiers.py com mocks de LLM.
 
+
+# Testes para services/classifiers.py com mocks de LLM.
+
+"""
 Cobertura:
     - Batching por repositório em classify_project_type
     - Cache hit/miss em dois níveis
