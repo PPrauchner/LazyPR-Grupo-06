@@ -46,27 +46,27 @@ def hash_content(text: str) -> str:
 
 
 def hash_file_stream(stream: IO[str]) -> Tuple[str, Generator[str, None, None]]:
-    """Calcula hash SHA-256 de arquivo em streaming.
+    """Calcula hash SHA-256 de arquivo em streaming sem materializar em memória.
 
-    Lê arquivo linha a linha, calcula hash SHA-256,
-    e retorna digest + gerador para consumo lazy.
+    Percorre o stream uma vez para acumular o digest SHA-256 e, em seguida,
+    reposiciona o ponteiro para o início via seek(0), retornando um novo
+    gerador independente sobre o mesmo stream. Nenhuma lista de linhas é
+    criada em nenhum momento.
 
     Args:
-        stream: File object aberto em modo texto.
+        stream: File object aberto em modo texto que suporte seek(0).
 
     Returns:
-        Tupla (hex_digest, line_generator) onde line_generator
-        produz as mesmas linhas do arquivo.
+        Tupla (hex_digest, line_generator) onde line_generator produz as
+        mesmas linhas do arquivo em ordem, de forma lazy.
     """
     sha256 = hashlib.sha256()
-    lines = []
-
     for line in stream:
         sha256.update(line.encode("utf-8"))
-        lines.append(line)
 
     digest = sha256.hexdigest()
-    return digest, (line for line in lines)
+    stream.seek(0)
+    return digest, (line for line in stream)
 
 
 def hash_record(pr_record: PRRecord) -> str:
