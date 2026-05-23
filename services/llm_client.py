@@ -29,6 +29,7 @@ Relacionado a:
 import os
 import time
 import itertools
+import functools
 from typing import Generator, Iterator
 
 try:
@@ -263,4 +264,82 @@ def classify_project_type_batch(records: tuple[PRRecord, ...]) -> str:
     client = _build_client(api_key)
     prompt = _build_prompt(records, max_chars)
 
+    return _invoke_with_retry(client=client, model=model, prompt=prompt)
+
+
+def classify_pr_nature_single(record: PRRecord) -> str:
+    """
+    Classifica a natureza de um PR individual baseada no corpo da descrição.
+
+    Envia um único PR ao LLM com prompt específico para inferir sua natureza:
+    bug_fix, feature, refactoring, documentation ou other.
+
+    Memoizado: mesma entrada (record) → mesma saída (cached).
+
+    Args:
+        record: PRRecord a classificar.
+
+    Returns:
+        String JSON bruta retornada pelo LLM,
+        ex: '{"pr_nature": "feature"}'.
+
+    Raises:
+        ValueError: Se a API key não estiver definida ou LLM falhar.
+    """
+    if not record.body or not record.body.strip():
+        return '{"pr_nature": "other"}'
+
+    prompt = (
+        "You are an AI assistant classifying the nature of a GitHub Pull Request.\n"
+        "Analyze the PR description and determine its nature.\n"
+        "Valid values for 'pr_nature': 'bug_fix', 'feature', 'refactoring', 'documentation', 'other'.\n"
+        "Return ONLY a JSON object with a single key. No explanations, no markdown.\n"
+        'Example: {"pr_nature": "feature"}\n'
+        f"\nRepository: {record.repo}\n"
+        f"Path: {record.path[:100]}\n"
+        f"PR Description: {record.body[:1000]}\n"
+    )
+
+    api_key = os.getenv("GROQ_API_KEY")
+    model = os.getenv("LAZYPR_MODEL", "llama3-8b-8192")
+
+    client = _build_client(api_key)
+    return _invoke_with_retry(client=client, model=model, prompt=prompt)
+
+
+def classify_clarity_single(record: PRRecord) -> str:
+    """
+    Classifica o nível de clareza da descrição de um PR individual.
+
+    Envia um único PR ao LLM com prompt específico para avaliar se a
+    descrição é insufficient, basic, good ou excellent.
+
+    Args:
+        record: PRRecord a classificar.
+
+    Returns:
+        String JSON bruta retornada pelo LLM,
+        ex: '{"clarity_level": "good"}'.
+
+    Raises:
+        ValueError: Se a API key não estiver definida ou LLM falhar.
+    """
+    if not record.body or not record.body.strip():
+        return '{"clarity_level": "insufficient"}'
+
+    prompt = (
+        "You are an AI assistant evaluating the clarity of GitHub Pull Request descriptions.\n"
+        "Assess the PR description and determine its clarity level.\n"
+        "Valid values for 'clarity_level': 'insufficient', 'basic', 'good', 'excellent'.\n"
+        "Consider: presence of context, problem statement, solution explanation, and examples.\n"
+        "Return ONLY a JSON object with a single key. No explanations, no markdown.\n"
+        'Example: {"clarity_level": "good"}\n'
+        f"\nRepository: {record.repo}\n"
+        f"PR Description: {record.body[:1000]}\n"
+    )
+
+    api_key = os.getenv("GROQ_API_KEY")
+    model = os.getenv("LAZYPR_MODEL", "llama3-8b-8192")
+
+    client = _build_client(api_key)
     return _invoke_with_retry(client=client, model=model, prompt=prompt)
