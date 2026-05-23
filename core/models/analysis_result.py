@@ -61,18 +61,16 @@ ClarityLevel = Literal[
 
 
 class AnalysisResult(NamedTuple):
-"""    Registro enriquecido produzido ao final do pipeline de analise.
-
+    """
+    Registro enriquecido produzido ao final do pipeline de analise.
     Este tipo estende o PRRecord bruto de forma estrutural: ele mantem todos os
     campos do registro original e acrescenta os atributos produzidos pelas
     etapas de classificacao e normalizacao.
-
     As classificacoes usam vocabulario controlado. Quando uma classificacao nao
     estiver disponivel por falha de LLM, cache miss ou resposta invalida, o
-    pipeline deve preencher o campo correspondente com "unknown".
+    pipeline deve preencher o campo correspondente com "unknown". A
 
-    A
-        Campos herdados do PRRecord:
+    Campos herdados do PRRecord:
         id: Identificador do comentario no dataset original.
         html_url: URL do comentario no GitHub.
         repo: Repositorio extraido da html_url, no formato "owner/name".
@@ -88,19 +86,21 @@ class AnalysisResult(NamedTuple):
     """
 
     id: int
-    html_url: str
-    repo: str
-    path: str
-    body: str
-    diff_hunk: str
-    author: str
-    author_association: str
-    commit_id: str
-    line: int
-    language: str
-    created_at: str | None
-    project_type: ProjectType
-    pr_nature: PRNature
-    clarity_level: ClarityLevel
-    char_count: int
-    word_count: int
+
+
+html_url: str
+repo: str
+path: str
+body: str
+diff_hunk: str
+author: str
+author_association: str
+commit_id: str
+line: int
+language: str
+created_at: str | None
+project_type: ProjectType
+pr_nature: PRNature
+clarity_level: ClarityLevel
+char_count: int
+word_count: int
