@@ -31,7 +31,7 @@ Relacionado a:
 from __future__ import annotations
 
 import functools
-from typing import Optional
+from typing import Optional, NamedTuple
 
 from core.models.analysis_result import AnalysisResult
 from core.models.pr_record import PRRecord
@@ -248,50 +248,4 @@ def normalize_analysis_result(result: AnalysisResult) -> AnalysisResult:
         pr_nature=normalized_pr_nature,
         clarity_level=normalized_clarity_level,
     )
-    
-class TextMetrics(NamedTuple):
-    """Immutable data structure for text physical dimensions."""
-    char_count: int
-    word_count: int
 
-def compute_text_metrics(body: str) -> TextMetrics:
-    """
-    Computes total characters and total words in a given text.
-    
-    Pure function: depends entirely on input, does not mutate state.
-    Utilizes built-in optimized methods instead of explicit loops.
-    
-    Args:
-        body (str): The PR body text.
-        
-    Returns:
-        TextMetrics: A named tuple containing character and word counts.
-    """
-    if not body:
-        return TextMetrics(char_count=0, word_count=0)
-        
-    return TextMetrics(
-        char_count=len(body),
-        word_count=len(body.split())
-    )
-
-def normalize_pr_record(record: CleanPRRecord) -> NormalizedPRRecord:
-    """
-    Applies all normalizations to a CleanPRRecord.
-    Pure function: same input -> same output. No external state modified.
-    """
-    metrics = compute_text_metrics(record.body)
-    
-    return NormalizedPRRecord(
-        title=record.title,
-        body=record.body,
-        author=record.author,
-        language=normalize_language(record.language),
-        project_type=record.project_type,
-        contribution_nature=normalize_label(record.contribution_nature),
-        clarity_level=record.clarity_level,
-        created_at=record.created_at,
-        created_at_ts=to_unix_timestamp(record.created_at),
-        char_count=metrics.char_count,  # Extracted from pure function
-        word_count=metrics.word_count,  # Extracted from pure function
-    )

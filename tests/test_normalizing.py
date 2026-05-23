@@ -27,48 +27,7 @@ from core.transforms.normalizing import (
 # Fixtures
 # ---------------------------------------------------------------------------
 
-
-@pytest.fixture
-def sample_pr():
-    """Fixture de um PRRecord para testes."""
-    return PRRecord(
-        id=178204099,
-        html_url="https://github.com/golang/go/pull/23805#discussion_r178204099",
-        repo="golang/go",
-        path="src/math/rand/rand.go",
-        body="This is a test body with some content.",
-        diff_hunk="@@ -210,6 +210,11 @@ again:",
-        author="test_user",
-        author_association="CONTRIBUTOR",
-        commit_id="f200cd75ab7c3fd16e046fa3cbc76565c4063cec",
-        line=213,
-        language="go",
-        created_at="2020-01-01T00:00:00Z",
-    )
-
-
-@pytest.fixture
-def sample_analysis_result(sample_pr):
-    """Fixture de um AnalysisResult para testes."""
-    return AnalysisResult(
-        id=sample_pr.id,
-        html_url=sample_pr.html_url,
-        repo=sample_pr.repo,
-        path=sample_pr.path,
-        body=sample_pr.body,
-        diff_hunk=sample_pr.diff_hunk,
-        author=sample_pr.author,
-        author_association=sample_pr.author_association,
-        commit_id=sample_pr.commit_id,
-        line=sample_pr.line,
-        language=sample_pr.language,
-        created_at=sample_pr.created_at,
-        project_type="library",
-        pr_nature="feature",
-        clarity_level="good",
-        char_count=37,
-        word_count=8,
-    )
+# sample_pr e sample_analysis_result são importadas do conftest.py compartilhado
 
 
 # ---------------------------------------------------------------------------

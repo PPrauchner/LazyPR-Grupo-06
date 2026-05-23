@@ -21,7 +21,6 @@ from core.pipeline.runner import (
     PipelineMetrics,
 )
 from core.pipeline.composer import pipe, compose, identity
-from utils.memoization import clear_cache
 
 
 # ---------------------------------------------------------------------------
@@ -30,79 +29,9 @@ from utils.memoization import clear_cache
 
 
 @pytest.fixture
-def sample_pr():
-    """Fixture de um PRRecord para testes."""
-    return PRRecord(
-        id=1,
-        html_url="https://github.com/golang/go/pull/23805#discussion_r1",
-        repo="golang/go",
-        path="src/math/rand/rand.go",
-        body="This fixes an issue with random number generation.",
-        diff_hunk="@@ -210,6 +210,11 @@",
-        author="test_user",
-        author_association="CONTRIBUTOR",
-        commit_id="abc123",
-        line=213,
-        language="Python 3",  # Será normalizado para "python"
-        created_at="2020-01-01T00:00:00Z",
-    )
-
-
-@pytest.fixture
-def sample_pr_list():
-    """Fixture de múltiplos PRRecords."""
-    return [
-        PRRecord(
-            id=1,
-            html_url="https://github.com/golang/go/pull/1#discussion_r1",
-            repo="golang/go",
-            path="file1.go",
-            body="Bug fix for issue X.",
-            diff_hunk="@@ @@",
-            author="user1",
-            author_association="CONTRIBUTOR",
-            commit_id="abc",
-            line=1,
-            language="go",
-            created_at=None,
-        ),
-        PRRecord(
-            id=2,
-            html_url="https://github.com/golang/go/pull/2#discussion_r2",
-            repo="golang/go",
-            path="file2.go",
-            body="New feature Y for performance.",
-            diff_hunk="@@ @@",
-            author="user2",
-            author_association="MEMBER",
-            commit_id="def",
-            line=2,
-            language="golang",
-            created_at=None,
-        ),
-        PRRecord(
-            id=3,
-            html_url="https://github.com/torvalds/linux/pull/3#discussion_r3",
-            repo="torvalds/linux",
-            path="drivers/gpu/drm.c",
-            body="GPU driver fix.",
-            diff_hunk="@@ @@",
-            author="user3",
-            author_association="OWNER",
-            commit_id="ghi",
-            line=3,
-            language="c",
-            created_at=None,
-        ),
-    ]
-
-
-@pytest.fixture(autouse=True)
-def clear_memoization_cache_fixture():
-    """Limpa cache entre testes."""
-    clear_cache()
-    yield
-    clear_cache()
+def sample_pr_list(sample_pr, sample_pr_same_repo, sample_pr_different_repo):
+    """Fixture de múltiplos PRRecords com dados do dataset."""
+    return [sample_pr, sample_pr_same_repo, sample_pr_different_repo]
 
 
 # ---------------------------------------------------------------------------
