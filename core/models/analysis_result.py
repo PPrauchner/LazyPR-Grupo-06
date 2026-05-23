@@ -86,21 +86,19 @@ class AnalysisResult(NamedTuple):
     """
 
     id: int
-
-
-html_url: str
-repo: str
-path: str
-body: str
-diff_hunk: str
-author: str
-author_association: str
-commit_id: str
-line: int
-language: str
-created_at: str | None
-project_type: ProjectType
-pr_nature: PRNature
-clarity_level: ClarityLevel
-char_count: int
-word_count: int
+    html_url: str
+    repo: str
+    path: str
+    body: str
+    diff_hunk: str
+    author: str
+    author_association: str
+    commit_id: str
+    line: int
+    language: str | None
+    created_at: str | None
+    project_type: ProjectType
+    pr_nature: PRNature
+    clarity_level: ClarityLevel
+    char_count: int
+    word_count: int
