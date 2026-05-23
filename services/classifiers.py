@@ -48,7 +48,11 @@ from core.transforms.normalizing import (
     calculate_word_count,
     normalize_label,
 )
-from services.llm_client import classify_project_type_batch
+from services.llm_client import (
+    classify_project_type_batch,
+    classify_pr_nature_single,
+    classify_clarity_single,
+)
 from utils.hashing import hash_record
 from utils.memoization import cached_classify
 
@@ -218,13 +222,14 @@ def classify_project_type(
         cache_key = hash_record(repo_records[0])
 
         # Define função que constrói AnalysisResult a partir da chamada LLM
-        def _llm_to_analysis_results():
+        # ISSUE-C FIX: Captura repo_records por valor (default parameter)
+        def _llm_to_analysis_results(rcs=repo_records):
             """Closure: chama LLM e retorna generator de AnalysisResult."""
-            raw_response = classify_project_type_batch(repo_records)
+            raw_response = classify_project_type_batch(rcs)
             project_type = _extract_field_from_json(raw_response, "project_type")
 
             # Constrói AnalysisResult para cada PR do batch
-            for record in repo_records:
+            for record in rcs:
                 analysis = _build_analysis_result(
                     record=record,
                     project_type=project_type,
@@ -243,8 +248,8 @@ def classify_pr_nature(record: PRRecord) -> str:
     """Classifica natureza da contribuição de um PR.
 
     Estratégia:
-    1. Cache key: hash do repositório + primeiros 500 chars do body
-    2. Chamada LLM com prompt específico
+    1. Cache em memória via lru_cache em classify_pr_nature_single()
+    2. Chamada LLM com prompt específico para pr_nature
     3. Extrai e normaliza resposta JSON
 
     Args:
@@ -259,17 +264,17 @@ def classify_pr_nature(record: PRRecord) -> str:
         >>> nature
         'feature'
     """
-    # Implementação simplificada: retorna "other" por padrão
-    # Em produção, integraria com cache dois níveis como em classify_project_type()
-    return _DEFAULT_PR_NATURE
+    # ISSUE-A: Implementação real com cache via lru_cache em singles
+    raw_response = classify_pr_nature_single(record)
+    return _extract_field_from_json(raw_response, "pr_nature")
 
 
 def classify_clarity(record: PRRecord) -> str:
     """Classifica clareza da descrição do PR.
 
     Estratégia:
-    1. Cache key: hash do body (mesmo PR pode ter clarity reavaliada)
-    2. Chamada LLM com prompt específico
+    1. Cache em memória via lru_cache em classify_clarity_single()
+    2. Chamada LLM com prompt específico para clarity_level
     3. Extrai e normaliza resposta JSON
 
     Args:
@@ -284,6 +289,6 @@ def classify_clarity(record: PRRecord) -> str:
         >>> clarity
         'good'
     """
-    # Implementação simplificada: retorna "other" por padrão
-    # Em produção, integraria com cache dois níveis como em classify_project_type()
-    return _DEFAULT_CLARITY_LEVEL
+    # ISSUE-B: Implementação real com cache via lru_cache em singles
+    raw_response = classify_clarity_single(record)
+    return _extract_field_from_json(raw_response, "clarity_level")

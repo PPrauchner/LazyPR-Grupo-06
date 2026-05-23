@@ -411,3 +411,161 @@ class TestClassifiersIntegration:
         result3 = classify_pr_nature(sample_pr)
 
         assert result1 == result2 == result3
+
+
+# ---------------------------------------------------------------------------
+# Tests: ISSUE-C - Closure Capture Fix
+# ---------------------------------------------------------------------------
+
+
+class TestClosureCaptureIssueC:
+    """Testes para validar fix de captura por referência (ISSUE-C)."""
+
+    @patch("services.classifiers.classify_project_type_batch")
+    def test_classify_project_type_closure_captures_by_value(
+        self, mock_llm, sample_pr, sample_pr_different_repo
+    ):
+        """Testa que closure não captura repo_records por referência."""
+        # Configure mock para retornar diferentes valores por chamada
+        mock_llm.side_effect = [
+            '{"project_type": "library"}',  # Primeira chamada (golang/go)
+            '{"project_type": "web_app"}',  # Segunda chamada (torvalds/linux)
+        ]
+
+        records = [sample_pr, sample_pr_different_repo]
+        results = list(classify_project_type(records))
+
+        # Deve retornar 2 resultados
+        assert len(results) == 2
+
+        # Cada PR deve ter classificação correta do seu repositório
+        golang_results = [r for r in results if r.repo == "golang/go"]
+        linux_results = [r for r in results if r.repo == "torvalds/linux"]
+
+        assert len(golang_results) == 1
+        assert len(linux_results) == 1
+
+        # Validar que cada recebeu sua classificação
+        assert golang_results[0].project_type == "library"
+        assert linux_results[0].project_type == "web_app"
+
+
+# ---------------------------------------------------------------------------
+# Tests: ISSUE-A - Real classify_pr_nature()
+# ---------------------------------------------------------------------------
+
+
+class TestClassifyPRNatureRealLLM:
+    """Testes para validar implementação real de classify_pr_nature (ISSUE-A)."""
+
+    @patch("services.classifiers.classify_pr_nature_single")
+    def test_classify_pr_nature_calls_llm_on_cache_miss(self, mock_llm, sample_pr):
+        """Testa que classify_pr_nature chama LLM em cache miss."""
+        mock_llm.return_value = '{"pr_nature": "feature"}'
+
+        result = classify_pr_nature(sample_pr)
+
+        # Deve chamar LLM uma vez
+        assert mock_llm.call_count == 1
+        # Deve normalizar e retornar "feature"
+        assert result == "feature"
+
+    @patch("services.classifiers.classify_pr_nature_single")
+    def test_classify_pr_nature_returns_normalized_value(self, mock_llm, sample_pr):
+        """Testa que normalize_label é aplicado ao resultado."""
+        # Mock retorna valor que precisa normalização
+        mock_llm.return_value = '{"pr_nature": "bug-fix"}'
+
+        result = classify_pr_nature(sample_pr)
+
+        # Deve normalizar "bug-fix" → "bug_fix"
+        assert result == "bug_fix"
+
+    @patch("services.classifiers.classify_pr_nature_single")
+    def test_classify_pr_nature_returns_other_on_invalid(self, mock_llm, sample_pr):
+        """Testa que retorna 'other' para labels inválidas."""
+        mock_llm.return_value = '{"pr_nature": "invalid_nature"}'
+
+        result = classify_pr_nature(sample_pr)
+
+        # Deve normalizar para "other"
+        assert result == "other"
+
+    @patch("services.classifiers.classify_pr_nature_single")
+    def test_classify_pr_nature_uses_two_level_cache(self, mock_llm, sample_pr):
+        """Testa que usa cache de dois níveis (memória + disco)."""
+        mock_llm.return_value = '{"pr_nature": "feature"}'
+
+        # Primeira chamada: cache miss, chama LLM
+        result1 = classify_pr_nature(sample_pr)
+        call_count_1 = mock_llm.call_count
+
+        # Segunda chamada: cache hit, não chama LLM
+        result2 = classify_pr_nature(sample_pr)
+        call_count_2 = mock_llm.call_count
+
+        assert result1 == "feature"
+        assert result2 == "feature"
+        # Mock não deve ser chamado novamente (cache hit)
+        assert call_count_1 == 1
+        assert call_count_2 == 1
+
+
+# ---------------------------------------------------------------------------
+# Tests: ISSUE-B - Real classify_clarity()
+# ---------------------------------------------------------------------------
+
+
+class TestClassifyClarityRealLLM:
+    """Testes para validar implementação real de classify_clarity (ISSUE-B)."""
+
+    @patch("services.classifiers.classify_clarity_single")
+    def test_classify_clarity_calls_llm_on_cache_miss(self, mock_llm, sample_pr):
+        """Testa que classify_clarity chama LLM em cache miss."""
+        mock_llm.return_value = '{"clarity_level": "good"}'
+
+        result = classify_clarity(sample_pr)
+
+        # Deve chamar LLM uma vez
+        assert mock_llm.call_count == 1
+        # Deve normalizar e retornar "good"
+        assert result == "good"
+
+    @patch("services.classifiers.classify_clarity_single")
+    def test_classify_clarity_returns_normalized_value(self, mock_llm, sample_pr):
+        """Testa que normalize_label é aplicado ao resultado."""
+        mock_llm.return_value = '{"clarity_level": "excellent"}'
+
+        result = classify_clarity(sample_pr)
+
+        # Deve manter "excellent" (já é válido)
+        assert result == "excellent"
+
+    @patch("services.classifiers.classify_clarity_single")
+    def test_classify_clarity_returns_other_on_invalid(self, mock_llm, sample_pr):
+        """Testa que retorna 'other' para labels inválidas."""
+        mock_llm.return_value = '{"clarity_level": "awesome"}'
+
+        result = classify_clarity(sample_pr)
+
+        # Deve normalizar para "other"
+        assert result == "other"
+
+    @patch("services.classifiers.classify_clarity_single")
+    def test_classify_clarity_uses_two_level_cache(self, mock_llm, sample_pr):
+        """Testa que usa cache de dois níveis (memória + disco)."""
+        mock_llm.return_value = '{"clarity_level": "good"}'
+
+        # Primeira chamada: cache miss, chama LLM
+        result1 = classify_clarity(sample_pr)
+        call_count_1 = mock_llm.call_count
+
+        # Segunda chamada: cache hit, não chama LLM
+        result2 = classify_clarity(sample_pr)
+        call_count_2 = mock_llm.call_count
+
+        assert result1 == "good"
+        assert result2 == "good"
+        # Mock não deve ser chamado novamente (cache hit)
+        assert call_count_1 == 1
+        assert call_count_2 == 1
