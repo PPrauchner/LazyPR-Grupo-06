@@ -22,7 +22,6 @@ from ui.layout import (
 
 from core.transforms.filtering import (
     Predicate,
-    apply_filters,
     by_clarity_level,
     by_language,
     by_pr_nature,
@@ -169,9 +168,7 @@ def render_sidebar() -> dict:
             key="dark_mode",
         )
 
-        st.caption(
-        "Alternar aparência visual do dashboard."
-        )
+        st.caption("Alternar aparência visual do dashboard.")
 
         st.session_state["theme_mode"] = "dark" if theme_toggle else "light"
 
@@ -179,15 +176,17 @@ def render_sidebar() -> dict:
 
         st.markdown("""
           Análise semântica de Pull Requests
-          com Programação Funcional e LLMs.""")
+          com Programação Funcional e LLMs.
+          """)
 
         st.divider()
 
         render_section_title("NAVEGAÇÃO")
 
-        selected_page = st.selectbox(
-            "Página",
+        selected_page = st.radio(
+            "Navegação",
             PAGES,
+            label_visibility="collapsed",
         )
 
         render_section_title("FILTROS GLOBAIS")
@@ -252,6 +251,7 @@ def render_sidebar() -> dict:
             dataset_name,
             len(tuple(analysis_results)),
         )
+
     return {
         "page": selected_page,
     }

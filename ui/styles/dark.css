@@ -6,6 +6,7 @@
 section[data-testid="stSidebar"] {
   background-color: #111827;
   border-right: 1px solid #1f2937;
+  box-shadow: 4px 0 25px rgba(0, 0, 0, 0.25);
 }
 
 div[data-testid="metric-container"] {
@@ -13,6 +14,7 @@ div[data-testid="metric-container"] {
   border: 1px solid #1f2937;
   border-radius: 16px;
   padding: 1rem;
+  box-shadow: 0 0 20px rgba(124, 58, 237, 0.1);
 }
 
 .block-container {
@@ -31,6 +33,36 @@ div[data-testid="metric-container"] {
   right: 2rem;
 }
 
-section[data-testid="stSidebar"] {
-  box-shadow: 4px 0 25px rgba(0, 0, 0, 0.25);
+/* Sidebar navigation */
+
+div[role="radiogroup"] label {
+  border-radius: 12px;
+  padding: 0.45rem 0.75rem;
+  margin-bottom: 0.35rem;
+  transition: 0.2s ease;
+}
+
+/* Hover */
+
+div[role="radiogroup"] label:hover {
+  background-color: rgba(255, 255, 255, 0.1);
+}
+
+/* Active page */
+
+div[role="radiogroup"] label[data-baseweb="radio"] {
+  background-color: rgba(124, 58, 237, 0.28);
+  border: 1px solid rgba(124, 58, 237, 0.35);
+}
+
+.stDataFrame {
+  border-radius: 12px;
+  overflow: hidden;
+}
+
+.stTextInput input,
+.stSelectbox div,
+.stMultiSelect div,
+.stDateInput input {
+  border-radius: 10px;
 }
