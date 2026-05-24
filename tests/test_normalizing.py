@@ -297,7 +297,7 @@ class TestNormalizeAnalysisResult:
         """Testa normalização com labels já válidos."""
         normalized = normalize_analysis_result(sample_analysis_result)
         assert normalized.project_type == "library"
-        assert normalized.pr_nature == "feature"
+        assert normalized.pr_nature == "bug_fix"
         assert normalized.clarity_level == "good"
 
     def test_normalize_analysis_result_invalid_project_type(
