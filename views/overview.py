@@ -68,7 +68,7 @@ def render_header() -> None:
     Renderiza cabeçalho principal.
     """
 
-    st.title("Overview de Pull Requests")
+    st.title("Overview Pull Requests")
 
     st.markdown("""
         Visualização agregada do volume de contribuições

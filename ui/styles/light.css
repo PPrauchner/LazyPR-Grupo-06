@@ -1,0 +1,36 @@
+.stApp {
+  background-color: #f8fafc;
+  color: #111827;
+}
+
+section[data-testid="stSidebar"] {
+  background-color: #ffffff;
+  border-right: 1px solid #e5e7eb;
+}
+
+div[data-testid="metric-container"] {
+  background-color: white;
+  border: 1px solid #e5e7eb;
+  border-radius: 16px;
+  padding: 1rem;
+}
+
+.block-container {
+  padding-top: 2rem;
+}
+
+[data-testid="stAppViewContainer"] {
+  background-color: #f8fafc;
+}
+
+[data-testid="stHeader"] {
+  background-color: transparent;
+}
+
+[data-testid="stToolbar"] {
+  right: 2rem;
+}
+
+section[data-testid="stSidebar"] {
+  box-shadow: 4px 0 25px rgba(0, 0, 0, 0.06);
+}

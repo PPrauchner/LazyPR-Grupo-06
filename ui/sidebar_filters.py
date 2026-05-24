@@ -15,6 +15,10 @@ Não deve:
 """
 
 import streamlit as st
+from ui.layout import (
+    render_section_title,
+    render_dataset_card,
+)
 
 from core.transforms.filtering import (
     Predicate,
@@ -58,10 +62,11 @@ CLARITY_LEVELS = (
 )
 
 PAGES = (
-    "Upload",
-    "Overview",
-    "Correlação",
-    "Exportação",
+    "🏠 Home",
+    "📂 Upload",
+    "📊 Overview",
+    "🔥 Correlação",
+    "💾 Exportação",
 )
 
 
@@ -155,21 +160,37 @@ def render_sidebar() -> dict:
 
     with st.sidebar:
 
-        st.title("RP3 Analytics")
+        if "dark_mode" not in st.session_state:
+
+            st.session_state["dark_mode"] = True
+
+        theme_toggle = st.toggle(
+            "🌙 Tema Escuro",
+            key="dark_mode",
+        )
+
+        st.caption(
+        "Alternar aparência visual do dashboard."
+        )
+
+        st.session_state["theme_mode"] = "dark" if theme_toggle else "light"
+
+        st.title("🚀 LazyPR")
 
         st.markdown("""
-            Dashboard funcional para análise
-            de Pull Requests do GitHub.
-            """)
+          Análise semântica de Pull Requests
+          com Programação Funcional e LLMs.""")
 
         st.divider()
+
+        render_section_title("NAVEGAÇÃO")
 
         selected_page = st.selectbox(
             "Página",
             PAGES,
         )
 
-        st.subheader("Filtros")
+        render_section_title("FILTROS GLOBAIS")
 
         selected_languages = st.multiselect(
             "Linguagens",
@@ -217,6 +238,20 @@ def render_sidebar() -> dict:
 
         st.caption("Projeto desenvolvido com " "Programação Funcional.")
 
+        dataset_name = st.session_state.get(
+            "dataset_name",
+            "Nenhum dataset",
+        )
+
+        analysis_results = st.session_state.get(
+            "analysis_results",
+            (),
+        )
+
+        render_dataset_card(
+            dataset_name,
+            len(tuple(analysis_results)),
+        )
     return {
         "page": selected_page,
     }

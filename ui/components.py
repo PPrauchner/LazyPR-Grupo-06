@@ -26,26 +26,61 @@ Relacionado a:
     - HU 09 (exportação acessível pela interface)
     - Regra Geral 08 (interface gráfica obrigatória)
 """
+
 import streamlit as st
 from typing import Any, Iterable
+from ui.theme import (
+    get_theme,
+)
 
 from core.models.analysis_result import AnalysisResult
 from services.exporters import to_download_bytes
 
 
-def metric_card(label: str, value: Any, delta: Any = None) -> None:
-    """Renderiza um cartão de métrica (KPI) de alto nível na interface.
-
-    Args:
-        label (str): Título ou descrição da métrica exibida.
-        value (Any): Valor numérico ou textual exibido em destaque.
-        delta (Any, opcional): Indicador de variação positivo ou negativo.
-            Quando positivo, exibido em verde; quando negativo, em vermelho.
-
-    Returns:
-        None: Função de efeito colateral — renderiza no Streamlit.
+def metric_card(
+    label: str,
+    value: Any,
+    delta: Any = None,
+) -> None:
     """
-    st.metric(label=label, value=value, delta=delta)
+    Renderiza cartão de métrica estilizado.
+    """
+
+    theme = get_theme()
+
+    st.markdown(
+        f"""
+        <div
+            style="
+                background-color: {theme['card']};
+                border: 1px solid {theme['border']};
+                padding: 1rem;
+                border-radius: 16px;
+                margin-bottom: 1rem;
+            "
+        >
+            <p
+                style="
+                    color: {theme['muted_text']};
+                    margin: 0;
+                    font-size: 0.9rem;
+                "
+            >
+                {label}
+            </p>
+
+            <h2
+                style="
+                    color: {theme['text']};
+                    margin-top: 0.5rem;
+                "
+            >
+                {value}
+            </h2>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
 
 
 def data_table(records: Iterable[AnalysisResult]) -> None:
