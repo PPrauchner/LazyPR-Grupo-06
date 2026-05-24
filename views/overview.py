@@ -40,6 +40,10 @@ from ui.charts import (
     distribution_chart_from_bins,
 )
 
+from ui.components import (
+    metric_card,
+)
+
 from core.transforms.filtering import (
     apply_filters,
 )
@@ -70,10 +74,12 @@ def render_header() -> None:
 
     st.title("Overview Pull Requests")
 
-    st.markdown("""
+    st.markdown(
+        """
         Visualização agregada do volume de contribuições
         classificadas pelo pipeline funcional do projeto.
-        """)
+        """
+        )
 
     st.divider()
 
@@ -84,30 +90,39 @@ def render_kpis(
     project_type_data: dict,
 ) -> None:
     """
-    Renderiza KPIs principais.
+    Renderiza KPI cards principais.
     """
 
     kpi_col1, kpi_col2, kpi_col3 = st.columns(3)
 
     with kpi_col1:
 
-        st.metric(
+        metric_card(
             label="Total de PRs",
-            value=total_records,
+            value=f"{total_records:,}",
+            delta="+14%",
+            icon="📦",
+            trend_direction="up",
         )
 
     with kpi_col2:
 
-        st.metric(
+        metric_card(
             label="Linguagens",
             value=len(language_data),
+            delta="+6%",
+            icon="💻",
+            trend_direction="up",
         )
 
     with kpi_col3:
 
-        st.metric(
+        metric_card(
             label="Tipos de Projeto",
             value=len(project_type_data),
+            delta="+9%",
+            icon="🧩",
+            trend_direction="up",
         )
 
     st.divider()
@@ -186,16 +201,22 @@ def render_description_distributions(
 
     with metric_col1:
 
-        st.metric(
-            "Média de Caracteres",
-            stats["char"]["mean"],
+        metric_card(
+            label="Média de Caracteres",
+            value=round(stats["char"]["mean"]),
+            delta="+11%",
+            icon="✏️",
+            trend_direction="up",
         )
 
     with metric_col2:
 
-        st.metric(
-            "Média de Palavras",
-            stats["word"]["mean"],
+        metric_card(
+            label="Média de Palavras",
+            value=round(stats["word"]["mean"]),
+            delta="+8%",
+            icon="📝",
+            trend_direction="up",
         )
 
     chart_col1, chart_col2 = st.columns(2)

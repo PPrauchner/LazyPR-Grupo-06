@@ -40,43 +40,81 @@ from services.exporters import to_download_bytes
 def metric_card(
     label: str,
     value: Any,
-    delta: Any = None,
+    delta: str = "",
+    icon: str = "📊",
+    trend_direction: str = "up",
 ) -> None:
     """
-    Renderiza cartão de métrica estilizado.
+    Renderiza KPI card moderno reutilizável.
     """
 
     theme = get_theme()
+
+    trend_color = theme["success"] if trend_direction == "up" else theme["error"]
+
+    trend_icon = "↑" if trend_direction == "up" else "↓"
 
     st.markdown(
         f"""
         <div
             style="
-                background-color: {theme['card']};
+                background: linear-gradient(
+                    135deg,
+                    {theme['card']},
+                    rgba(124,58,237,0.10)
+                );
                 border: 1px solid {theme['border']};
-                padding: 1rem;
-                border-radius: 16px;
+                border-radius: 20px;
+                padding: 1.2rem;
                 margin-bottom: 1rem;
+                box-shadow: 0 0 25px rgba(124,58,237,0.18);
+                transition: 0.2s ease;
+                cursor: pointer;
             "
         >
-            <p
+
+            <div
                 style="
-                    color: {theme['muted_text']};
-                    margin: 0;
-                    font-size: 0.9rem;
+                    display: flex;
+                    justify-content: space-between;
+                    align-items: center;
                 "
             >
-                {label}
-            </p>
 
-            <h2
+                <div
+                    style="
+                        color: {theme['muted_text']};
+                        font-size: 0.95rem;
+                        font-weight: 600;
+                    "
+                >
+                    {icon} {label}
+                </div>
+
+            </div>
+
+            <div
                 style="
+                    margin-top: 1rem;
+                    font-size: 2rem;
+                    font-weight: 800;
                     color: {theme['text']};
-                    margin-top: 0.5rem;
                 "
             >
                 {value}
-            </h2>
+            </div>
+
+            <div
+                style="
+                    margin-top: 0.5rem;
+                    color: {trend_color};
+                    font-size: 0.9rem;
+                    font-weight: 700;
+                "
+            >
+                {trend_icon} {delta}
+            </div>
+
         </div>
         """,
         unsafe_allow_html=True,

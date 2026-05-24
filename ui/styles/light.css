@@ -33,8 +33,6 @@ div[data-testid="metric-container"] {
   right: 2rem;
 }
 
-/* Sidebar navigation */
-
 div[role="radiogroup"] label {
   border-radius: 12px;
   padding: 0.45rem 0.75rem;
@@ -42,13 +40,9 @@ div[role="radiogroup"] label {
   transition: 0.2s ease;
 }
 
-/* Hover */
-
 div[role="radiogroup"] label:hover {
   background-color: rgba(0, 0, 0, 0.04);
 }
-
-/* Active page */
 
 div[role="radiogroup"] label[data-baseweb="radio"] {
   background-color: rgba(124, 58, 237, 0.14);
