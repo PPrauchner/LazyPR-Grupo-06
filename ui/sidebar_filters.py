@@ -52,8 +52,8 @@ PR_NATURES = (
 CLARITY_LEVELS = (
     "excellent",
     "good",
-    "average",
-    "poor",
+    "basic",
+    "insufficient",
 )
 
 PAGES = (

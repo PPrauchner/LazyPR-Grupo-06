@@ -30,6 +30,7 @@ Relacionado a:
 """
 from collections.abc import Callable, Iterable
 from functools import reduce
+from datetime import datetime
 
 from core.models.analysis_result import AnalysisResult
 
@@ -54,6 +55,11 @@ def by_language(languages: tuple[str, ...]) -> Predicate:
     return lambda record: record.language.lower() in allowed
 
 
+def is_language(language: str) -> Predicate:
+    """Wrapper para by_language que aceita uma linguagem individual."""
+    return by_language((language,))
+
+
 def by_project_type(project_types: tuple[str, ...]) -> Predicate:
     """
     Cria um predicado para filtrar registros por tipo de projeto.
@@ -70,6 +76,11 @@ def by_project_type(project_types: tuple[str, ...]) -> Predicate:
     """
     allowed = frozenset(map(str.lower, project_types))
     return lambda record: record.project_type.lower() in allowed
+
+
+def has_project_type(project_type: str) -> Predicate:
+    """Wrapper para by_project_type que aceita um tipo individual."""
+    return by_project_type((project_type,))
 
 
 def by_pr_nature(pr_natures: tuple[str, ...]) -> Predicate:
@@ -90,6 +101,11 @@ def by_pr_nature(pr_natures: tuple[str, ...]) -> Predicate:
     return lambda record: record.pr_nature.lower() in allowed
 
 
+def has_pr_nature(pr_nature: str) -> Predicate:
+    """Wrapper para by_pr_nature que aceita uma natureza individual."""
+    return by_pr_nature((pr_nature,))
+
+
 def by_clarity_level(clarity_levels: tuple[str, ...]) -> Predicate:
     """
     Cria um predicado para filtrar registros por nível de clareza.
@@ -107,6 +123,41 @@ def by_clarity_level(clarity_levels: tuple[str, ...]) -> Predicate:
     """
     allowed = frozenset(map(str.lower, clarity_levels))
     return lambda record: record.clarity_level.lower() in allowed
+
+
+def has_clarity_level(clarity_level: str) -> Predicate:
+    """Wrapper para by_clarity_level que aceita um nível individual."""
+    return by_clarity_level((clarity_level,))
+
+
+def is_in_date_range(start_date: str, end_date: str) -> Predicate:
+    """
+    Cria um predicado para filtrar registros por intervalo de datas.
+
+    As datas devem estar em formato ISO 8601 (YYYY-MM-DD).
+    Aceita timestamps completos (com hora) e compara apenas a data.
+
+    Args:
+        start_date: Data inicial do intervalo (inclusive).
+        end_date: Data final do intervalo (inclusive).
+
+    Returns:
+        Função que recebe um AnalysisResult e retorna True quando a data
+        do registro estiver dentro do intervalo especificado.
+    """
+    start = datetime.strptime(start_date, "%Y-%m-%d").date()
+    end = datetime.strptime(end_date, "%Y-%m-%d").date()
+
+    def predicate(record: AnalysisResult) -> bool:
+        if not record.created_at:
+            return False
+        try:
+            record_date = datetime.fromisoformat(record.created_at).date()
+            return start <= record_date <= end
+        except (ValueError, AttributeError):
+            return False
+
+    return predicate
 
 
 def compose_predicates(predicates: Iterable[Predicate]) -> Predicate:
@@ -138,6 +189,22 @@ def compose_predicates(predicates: Iterable[Predicate]) -> Predicate:
         ),
         predicate_tuple,
     )
+
+
+def build_filter(*predicates: Predicate) -> Predicate:
+    """
+    Compõe múltiplos predicados em um único predicado via conjunção lógica (AND).
+
+    Função de conveniência que aceita predicados como argumentos variádicos
+    em vez de um iterável.
+
+    Args:
+        *predicates: Predicados variádicos a serem compostos.
+
+    Returns:
+        Um único predicado que retorna True se todos os predicados forem satisfeitos.
+    """
+    return compose_predicates(predicates)
 
 
 def apply_filters(
