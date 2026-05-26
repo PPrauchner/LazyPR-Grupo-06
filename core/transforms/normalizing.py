@@ -6,7 +6,7 @@ de um `PRRecord` para formatos canônicos utilizados nas análises.
 
 Responsabilidades:
     - Normalizar strings de linguagem de programação para um conjunto
-      controlado de valores (ex: "python", "Python 3" → "Python").
+      controlado de valores (ex: "python", "Python 3" → "python").
     - Converter campos de data para objetos `datetime` ou timestamps Unix
       de forma consistente, independente do formato de origem do dataset.
     - Calcular e adicionar métricas derivadas de texto: `char_count` e
@@ -29,199 +29,130 @@ Relacionado a:
 """
 
 from __future__ import annotations
-from dataclasses import dataclass
-from datetime import date, datetime, timezone
-from core.transforms.cleaning import PRRecord
-from typing import NamedTuple
 
-_LANGUAGE_MAP: dict[str, str] = {
-    "python": "Python",
-    "python3": "Python",
-    "python 3": "Python",
-    "js": "JavaScript",
-    "javascript": "JavaScript",
-    "ts": "TypeScript",
-    "typescript": "TypeScript",
-    "java": "Java",
-    "kotlin": "Kotlin",
-    "go": "Go",
-    "golang": "Go",
-    "rust": "Rust",
-    "c#": "C#",
-    "csharp": "C#",
-    "c++": "C++",
-    "cpp": "C++",
-    "ruby": "Ruby",
-    "php": "PHP",
-    "swift": "Swift",
-    "scala": "Scala",
-    "shell": "Shell",
-    "bash": "Shell",
-    "unknown": "unknown",
+import functools
+from typing import Optional
+
+from core.models.analysis_result import AnalysisResult
+from core.models.pr_record import PRRecord
+
+# ---------------------------------------------------------------------------
+# Vocabulário Controlado (Normalizações Obrigatórias)
+# ---------------------------------------------------------------------------
+
+_VALID_PROJECT_TYPES = frozenset(["library", "web_app", "framework", "cli", "other"])
+_VALID_PR_NATURES = frozenset(
+    ["bug_fix", "feature", "refactoring", "documentation", "other"]
+)
+_VALID_CLARITY_LEVELS = frozenset(["insufficient", "basic", "good", "excellent"])
+
+# Mapeamento de variações de linguagem para forma canônica
+# Estratégia: map() + filter() para cada variação encontrada
+_LANGUAGE_VARIANTS = {
+    "python": frozenset(["python", "python3", "python 3", "py", "py3"]),
+    "javascript": frozenset(["javascript", "js", "ecmascript", "es6", "es2015"]),
+    "typescript": frozenset(["typescript", "ts"]),
+    "java": frozenset(["java", "jvm"]),
+    "csharp": frozenset(["csharp", "c#", ".net"]),
+    "go": frozenset(["go", "golang"]),
+    "rust": frozenset(["rust", "rs"]),
+    "cpp": frozenset(["c++", "cpp", "cxx"]),
+    "c": frozenset(["c"]),
+    "ruby": frozenset(["ruby", "rb"]),
+    "php": frozenset(["php"]),
 }
 
 
-_LABEL_MAP: dict[str, str] = {
-    "bug_fix": "bug_fix",
-    "bugfix": "bug_fix",
-    "bug-fix": "bug_fix",
-    "bug fix": "bug_fix",
-    "fix": "bug_fix",
-    "feature": "feature",
-    "feat": "feature",
-    "new feature": "feature",
-    "refactoring": "refactoring",
-    "refactor": "refactoring",
-    "refact": "refactoring",
-    "documentation": "documentation",
-    "docs": "documentation",
-    "doc": "documentation",
-    # clareza
-    "insuficiente": "insuficiente",
-    "basica": "basica",
-    "básica": "basica",
-    "boa": "boa",
-    "excelente": "excelente",
-}
+# ---------------------------------------------------------------------------
+# Funções Puras de Normalização
+# ---------------------------------------------------------------------------
 
+@functools.lru_cache(maxsize=256)
+def normalize_language(text: str | None) -> str | None:
+    """Normaliza string de linguagem para forma canônica.
 
-@dataclass(frozen=True)
-class NormalizedPRRecord:
-    """PRRecord com campos normalizados e métricas derivadas."""
-
-    title: str
-    body: str
-    author: str
-    language: str
-    project_type: str
-    contribution_nature: str
-    clarity_level: int
-    created_at: date
-    created_at_ts: int
-    char_count: int
-    word_count: int
-
-
-# Funções puras de normalização
-def normalize_language(value: str) -> str:
+    Mapeia variações ("Python 3", "py3") para forma canônica ("python").
+    Se não encontrar variação conhecida, retorna None.
     """
-    Converte variações de nome de linguagem para o valor canônico.
+    if text is None or not isinstance(text, str):
+        return None
 
-    Exemplos:
-        "python 3" → "Python"
-        "js"       → "JavaScript"
-        "golang"   → "Go"
+    normalized_input = text.strip().lower()
 
-    Retorna o valor original capitalizado se não houver mapeamento.
-    """
-    return _LANGUAGE_MAP.get(value.strip().lower(), value.strip().capitalize())
-
-
-def normalize_label(value: str) -> str:
-    """
-    Padroniza labels retornados pelo LLM para o vocabulário controlado.
-
-    Exemplos:
-        "BugFix"  → "bug_fix"
-        "bug-fix" → "bug_fix"
-        "docs"    → "documentation"
-        "básica"  → "basica"
-
-    Retorna o valor normalizado em snake_case se não houver mapeamento.
-    """
-    key = value.strip().lower().replace("-", "_").replace(" ", "_")
-    return _LABEL_MAP.get(key, key)
-
-
-def to_unix_timestamp(value: date) -> int:
-    """
-    Converte um objeto date para timestamp Unix (inteiro).
-
-    Utiliza UTC para garantir consistência independente do ambiente.
-
-    Exemplo:
-        date(2024, 3, 15) → 1710460800
-    """
-    dt = datetime(value.year, value.month, value.day, tzinfo=timezone.utc)
-    return int(dt.timestamp())
-
-
-def compute_char_count(text: str) -> int:
-    """Retorna o número de caracteres do texto."""
-    return len(text)
-
-
-def compute_word_count(text: str) -> int:
-    """Retorna o número de palavras do texto (split por espaço/newline)."""
-    return len(text.split()) if text else 0
-
-
-# Ponto de entrada público
-def normalize_pr_record(record: PRRecord) -> NormalizedPRRecord:
-    """
-    Aplica todas as normalizações a um PRRecord.
-
-    Função pura: mesma entrada → sempre a mesma saída.
-    Nenhum estado externo é lido ou modificado.
-    """
-    return NormalizedPRRecord(
-        title=record.title,
-        body=record.body,
-        author=record.author,
-        language=normalize_language(record.language),
-        project_type=record.project_type,
-        contribution_nature=normalize_label(record.contribution_nature),
-        clarity_level=record.clarity_level,
-        created_at=record.created_at,
-        created_at_ts=to_unix_timestamp(record.created_at),
-        char_count=compute_char_count(record.body),
-        word_count=compute_word_count(record.body),
+    # Procura a linguagem canônica que contém esta variação
+    # Implementado com next() + iterador para pureza funcional
+    matching_lang = next(
+        (
+            lang
+            for lang, variants in _LANGUAGE_VARIANTS.items()
+            if normalized_input in variants
+        ),
+        None,
     )
 
-
-class TextMetrics(NamedTuple):
-    """Immutable data structure for text physical dimensions."""
-
-    char_count: int
-    word_count: int
+    return matching_lang
 
 
-def compute_text_metrics(body: str) -> TextMetrics:
-    """
-    Computes total characters and total words in a given text.
+def calculate_char_count(body: str) -> int:
+    """Calcula número de caracteres no corpo do PR."""
+    return len(body) if body else 0
 
-    Pure function: depends entirely on input, does not mutate state.
-    Utilizes built-in optimized methods instead of explicit loops.
 
-    Args:
-        body (str): The PR body text.
-
-    Returns:
-        TextMetrics: A named tuple containing character and word counts.
-    """
+def calculate_word_count(body: str) -> int:
+    """Calcula número de palavras no corpo do PR."""
     if not body:
-        return TextMetrics(char_count=0, word_count=0)
+        return 0
+    return len(body.split())
 
-    return TextMetrics(char_count=len(body), word_count=len(body.split()))
 
+@functools.lru_cache(maxsize=256)
+def normalize_label(label: str, field: str) -> str:
+    """Normaliza label de classificação LLM para vocabulário controlado.
 
-def normalize_pr_record(record: PRRecord) -> NormalizedPRRecord:
+    Implementado com map() + filter() sobre vocabulário válido:
+    se label exato está no conjunto válido, retorna; caso contrário,
+    retorna "other" como sentinela.
     """
-    Applies all normalizations to a PRRecord.
-    Pure function: same input -> same output. No external state modified.
-    """
-    metrics = compute_text_metrics(record.body)
+    if not label:
+        return "other"
+        
+    normalized_label = label.strip().lower().replace("-", "_")
 
-    return NormalizedPRRecord(
-        title=record.title,
-        body=record.body,
-        author=record.author,
-        language=normalize_language(record.language),
-        project_type=record.project_type,
-        contribution_nature=normalize_label(record.contribution_nature),
-        clarity_level=record.clarity_level,
-        created_at=record.created_at,
-        created_at_ts=to_unix_timestamp(record.created_at),
-        char_count=metrics.char_count,  # Extracted from pure function
-        word_count=metrics.word_count,  # Extracted from pure function
+    # Seleciona vocabulário correto baseado no campo
+    valid_vocab = {
+        "project_type": _VALID_PROJECT_TYPES,
+        "pr_nature": _VALID_PR_NATURES,
+        "clarity_level": _VALID_CLARITY_LEVELS,
+    }.get(
+        field, _VALID_PROJECT_TYPES
+    )  # padrão seguro
+
+    # Retorna label se válido, senão "other"
+    return normalized_label if normalized_label in valid_vocab else "other"
+
+
+def normalize_pr_record(record: PRRecord) -> PRRecord:
+    """Normaliza campos de um PRRecord para valores canônicos.
+
+    Retorna novo PRRecord com language normalizada via normalize_language().
+    Função pura — nunca modifica record original, apenas retorna cópia enriquecida.
+    """
+    normalized_language = normalize_language(record.language)
+    return record._replace(language=normalized_language)
+
+
+def normalize_analysis_result(result: AnalysisResult) -> AnalysisResult:
+    """Normaliza campos de um AnalysisResult para vocabulário controlado.
+
+    Retorna novo AnalysisResult com labels de classificação normalizados
+    via normalize_label(). Função pura — nunca modifica result original.
+    """
+    normalized_project_type = normalize_label(result.project_type, "project_type")
+    normalized_pr_nature = normalize_label(result.pr_nature, "pr_nature")
+    normalized_clarity_level = normalize_label(result.clarity_level, "clarity_level")
+
+    return result._replace(
+        project_type=normalized_project_type,
+        pr_nature=normalized_pr_nature,
+        clarity_level=normalized_clarity_level,
     )

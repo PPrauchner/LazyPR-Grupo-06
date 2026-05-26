@@ -1,17 +1,15 @@
 """
-core/models/analysis_result.py
-===============================
 Define a estrutura de dados imutável que representa um pull request após
 o enriquecimento semântico realizado pelas classificações dos LLMs.
 
 Responsabilidades:
-    - Declarar o tipo `AnalysisResult` como NamedTuple (ou dataclass frozen=True),
-      estendendo os campos de `PRRecord` com os atributos classificados:
-        · project_type   — tipo do repositório (biblioteca, framework, app web, etc.)
-        · pr_nature      — natureza da contribuição (bug fix, feature, refatoração, docs)
-        · clarity_level  — clareza da descrição (insuficiente, básica, boa, excelente)
-        · char_count     — contagem de caracteres do corpo do PR
-        · word_count     — contagem de palavras do corpo do PR
+    - Declarar o tipo AnalysisResult como NamedTuple (ou dataclass frozen=True),
+      estendendo os campos de PRRecord com os atributos classificados:
+        - project_type: tipo do repositório (biblioteca, framework, app web, etc.)
+        - pr_nature: natureza da contribuição (bug fix, feature, refatoração, docs)
+        - clarity_level: clareza da descrição (insuficiente, básica, boa, excelente)
+        - char_count: contagem de caracteres do corpo do PR
+        - word_count: contagem de palavras do corpo do PR
     - Ser a estrutura-alvo produzida pelo pipeline após a etapa de classificação,
       consumida pelas camadas de agregação e visualização.
     - Garantir que classificações ausentes (falha de LLM, cache miss) sejam
@@ -63,19 +61,17 @@ ClarityLevel = Literal[
 
 
 class AnalysisResult(NamedTuple):
-    """
-    Registro enriquecido produzido ao final do pipeline de analise.
+    """Registro enriquecido produzido ao final do pipeline de analise.
 
-    Este tipo estende o PRRecord bruto de forma estrutural: ele mantem todos os
+    Este tipo estende o PRRecord bruto de forma estrutural: mantém todos os
     campos do registro original e acrescenta os atributos produzidos pelas
-    etapas de classificacao e normalizacao.
+    etapas de classificação e normalização.
 
-    As classificacoes usam vocabulario controlado. Quando uma classificacao nao
-    estiver disponivel por falha de LLM, cache miss ou resposta invalida, o
+    As classificações usam vocabulário controlado. Quando uma classificação não
+    estiver disponível por falha de LLM, cache miss ou resposta inválida, o
     pipeline deve preencher o campo correspondente com "unknown".
 
-    A
-        Campos herdados do PRRecord:
+    Attributes:
         id: Identificador do comentario no dataset original.
         html_url: URL do comentario no GitHub.
         repo: Repositorio extraido da html_url, no formato "owner/name".
@@ -88,6 +84,11 @@ class AnalysisResult(NamedTuple):
         line: Linha do arquivo relacionada ao comentario.
         language: Linguagem inferida ou normalizada para o registro.
         created_at: Data de criacao quando disponivel; caso contrario, None.
+        project_type: Tipo do repositorio classificado pelo LLM.
+        pr_nature: Natureza da contribuicao classificada pelo LLM.
+        clarity_level: Nivel de clareza da descricao classificado pelo LLM.
+        char_count: Contagem de caracteres do corpo do comentario.
+        word_count: Contagem de palavras do corpo do comentario.
     """
 
     id: int

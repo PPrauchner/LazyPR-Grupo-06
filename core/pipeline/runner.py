@@ -34,6 +34,7 @@ from typing import Callable, Iterable, NamedTuple, Generator
 
 from core.models.pr_record import PRRecord
 from core.models.analysis_result import AnalysisResult
+from core.pipeline.composer import pipe
 
 # ---------------------------------------------------------------------------
 # Métricas de Execução (Imutável)

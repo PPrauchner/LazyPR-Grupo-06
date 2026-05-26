@@ -3,7 +3,7 @@ tests/test_memoization.py
 ==========================
 Testes unitários para módulo de memoization.
 """
-
+import threading
 import tempfile
 from typing import Generator
 
@@ -289,6 +289,122 @@ class TestGetCacheStats:
         assert stats["misses"] == 3
         assert stats["hits"] == 2
         assert stats["total"] == 5
+        
+class TestMemoizationDiskCacheL2:
+    
+
+    def test_cache_hit_on_disk_when_memory_empty(self, reset_cache, temp_cache_dir):
+        
+        test_hash = "hash_disco_persistente"
+        
+        resultado_simulado = AnalysisResult(
+            id=99,
+            html_url="https://github.com/repo/test/pull/99",
+            repo="repo/test",
+            path="src/app.py",
+            body="Cache disco",
+            diff_hunk="@@",
+            author="tester",
+            author_association="NONE",
+            commit_id="000",
+            line=1,
+            language="Python",
+            created_at="2024-01-01",
+            project_type="api",
+            pr_nature="bugfix",
+            clarity_level="good",
+            char_count=10,
+            word_count=2,
+        )
+
+        # Simula o encerramento de uma sessão anterior salvando diretamente no disco
+        from services import storage
+        storage.save_results(test_hash, [resultado_simulado])
+
+        call_count = 0
+
+        def mock_classify_caro() -> Generator[AnalysisResult, None, None]:
+            nonlocal call_count
+            call_count += 1
+            yield resultado_simulado
+
+        # Nova sessão: L1 está vazio (via reset_cache fixture), mas o disco (L2) tem dados
+        resultados = list(memoization.cached_classify(mock_classify_caro, test_hash))
+
+        # Asserções críticas
+        assert call_count == 0  # A função de classificação da LLM NUNCA deve ser chamada
+        assert len(resultados) == 1
+        assert resultados[0].id == 99
+
+        # Verifica se as estatísticas contabilizaram como um Cache HIT bem-sucedido
+        stats = memoization.get_cache_stats()
+        assert stats["hits"] == 1
+        assert stats["misses"] == 0
+        
+import threading
+
+class TestMemoizationAdvancedResilience:
+    
+
+    def test_cached_classify_does_not_cache_exceptions(self, reset_cache, temp_cache_dir):
+        """Garante que se a LLM lançar exceção (ex: Timeout), o erro sobe e NADA vai para o cache."""
+        test_hash = "hash_erro_api"
+        call_count = 0
+
+        def mock_classify_failing() -> Generator[AnalysisResult, None, None]:
+            nonlocal call_count
+            call_count += 1
+            raise ConnectionError("Falha na API da LLM - Timeout")
+            yield  # Nunca chega aqui
+
+        # A execução deve propagar a exceção
+        with pytest.raises(ConnectionError):
+            list(memoization.cached_classify(mock_classify_failing, test_hash))
+
+        assert call_count == 1
+        
+        # O estado não deve ter sido alterado: não tem no cache em memória
+        assert test_hash not in memoization._in_memory_cache
+        
+        # Também não pode ter salvo um arquivo sujo/vazio no disco
+        from services.storage import has_cached_analysis
+        assert not has_cached_analysis(test_hash)
+
+    def test_cache_stats_thread_safety(self, reset_cache, temp_cache_dir):
+        """Testa se os Locks protegem a atualização das estatísticas do cache em acessos concorrentes."""
+        num_threads = 100
+        
+        def simulate_cache_access():
+            # Simula um "miss" direto atualizando as stats usando a função interna
+            memoization._update_stats(hit=False)
+
+        threads = []
+        for _ in range(num_threads):
+            t = threading.Thread(target=simulate_cache_access)
+            threads.append(t)
+            t.start()
+
+        for t in threads:
+            t.join()
+
+        # Como usamos o _stats_lock no código original, nenhuma operação += deve ter se perdido
+        stats = memoization.get_cache_stats()
+        assert stats["misses"] == num_threads
+        assert stats["hits"] == 0
+
+    def test_clear_cache_preserves_stats(self, reset_cache, temp_cache_dir):
+        """Verifica o comportamento de design: limpar a memória não zera o histórico de estatísticas."""
+        memoization._update_stats(hit=True)
+        memoization._update_stats(hit=False)
+        
+        assert memoization.get_cache_stats()["total"] == 2
+        
+        # Limpa o cache L1
+        memoization.clear_cache()
+        
+        # As estatísticas de vida útil da aplicação devem se manter
+        stats = memoization.get_cache_stats()
+        assert stats["total"] == 2
 
 
 if __name__ == "__main__":
