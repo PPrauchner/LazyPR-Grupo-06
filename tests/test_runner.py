@@ -23,7 +23,6 @@ from core.pipeline.runner import (
 from core.pipeline.composer import pipe, compose, identity
 from utils.memoization import clear_cache
 
-
 # ---------------------------------------------------------------------------
 # Fixtures
 # ---------------------------------------------------------------------------
@@ -374,4 +373,3 @@ class TestRunPipelineEdgeCases:
         results = list(run_pipeline(pr_generator(), config))
 
         assert len(results) == len(sample_pr_list)
-

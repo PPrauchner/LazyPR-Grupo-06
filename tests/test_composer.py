@@ -13,7 +13,6 @@ Cobertura:
 import pytest
 from core.pipeline.composer import pipe, compose, identity, _compose_pair
 
-
 # ---------------------------------------------------------------------------
 # Tests: pipe() - Esquerda para Direita
 # ---------------------------------------------------------------------------
@@ -38,7 +37,7 @@ class TestPipe:
         """Testa pipe com três funções."""
         add_one = lambda x: x + 1
         double = lambda x: x * 2
-        square = lambda x: x ** 2
+        square = lambda x: x**2
 
         # pipe: square(x) depois double() depois add_one()
         piped = pipe(square, double, add_one)
@@ -109,7 +108,7 @@ class TestCompose:
         """Testa compose com três funções."""
         add_one = lambda x: x + 1
         double = lambda x: x * 2
-        square = lambda x: x ** 2
+        square = lambda x: x**2
 
         # compose: add_one(double(square(x)))
         composed = compose(add_one, double, square)

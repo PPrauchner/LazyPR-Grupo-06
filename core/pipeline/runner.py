@@ -36,7 +36,6 @@ from core.models.pr_record import PRRecord
 from core.models.analysis_result import AnalysisResult
 from core.pipeline.composer import pipe
 
-
 # ---------------------------------------------------------------------------
 # Métricas de Execução (Imutável)
 # ---------------------------------------------------------------------------
@@ -152,7 +151,10 @@ def run_pipeline(
     else:
         # Se classification desabilitada, converter PRRecord para stub AnalysisResult
         # (com classifications vazias)
-        from core.transforms.normalizing import calculate_char_count, calculate_word_count
+        from core.transforms.normalizing import (
+            calculate_char_count,
+            calculate_word_count,
+        )
 
         def _stub_analysis_result(record: PRRecord) -> AnalysisResult:
             return AnalysisResult(

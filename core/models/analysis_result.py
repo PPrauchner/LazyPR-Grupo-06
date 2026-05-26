@@ -63,12 +63,12 @@ ClarityLevel = Literal[
 class AnalysisResult(NamedTuple):
     """Registro enriquecido produzido ao final do pipeline de analise.
 
-    Este tipo estende o PRRecord bruto de forma estrutural: ele mantem todos os
+    Este tipo estende o PRRecord bruto de forma estrutural: mantém todos os
     campos do registro original e acrescenta os atributos produzidos pelas
-    etapas de classificacao e normalizacao.
+    etapas de classificação e normalização.
 
-    As classificacoes usam vocabulario controlado. Quando uma classificacao nao
-    estiver disponivel por falha de LLM, cache miss ou resposta invalida, o
+    As classificações usam vocabulário controlado. Quando uma classificação não
+    estiver disponível por falha de LLM, cache miss ou resposta inválida, o
     pipeline deve preencher o campo correspondente com "unknown".
 
     Attributes:
