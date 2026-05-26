@@ -61,7 +61,7 @@ ClarityLevel = Literal[
 
 
 class AnalysisResult(NamedTuple):
-    """Registro enriquecido produzido ao final do pipeline de análise.
+    """Registro enriquecido produzido ao final do pipeline de analise.
 
     Este tipo estende o PRRecord bruto de forma estrutural: mantém todos os
     campos do registro original e acrescenta os atributos produzidos pelas
@@ -70,20 +70,25 @@ class AnalysisResult(NamedTuple):
     As classificações usam vocabulário controlado. Quando uma classificação não
     estiver disponível por falha de LLM, cache miss ou resposta inválida, o
     pipeline deve preencher o campo correspondente com "unknown".
-        A
-    Campos herdados do PRRecord:
-    id: Identificador do comentario no dataset original.
-    html_url: URL do comentario no GitHub.
-    repo: Repositorio extraido da html_url, no formato "owner/name".
-    path: Caminho do arquivo comentado no pull request.
-    body: Texto limpo do comentario.
-    diff_hunk: Trecho do diff associado ao comentario.
-    author: Login do autor do comentario.
-    author_association: Relacao do autor com o repositorio.
-    commit_id: Hash do commit associado ao comentario.
-    line: Linha do arquivo relacionada ao comentario.
-    language: Linguagem inferida ou normalizada para o registro.
-    created_at: Data de criacao quando disponivel; caso contrario, None.
+
+    Attributes:
+        id: Identificador do comentario no dataset original.
+        html_url: URL do comentario no GitHub.
+        repo: Repositorio extraido da html_url, no formato "owner/name".
+        path: Caminho do arquivo comentado no pull request.
+        body: Texto limpo do comentario.
+        diff_hunk: Trecho do diff associado ao comentario.
+        author: Login do autor do comentario.
+        author_association: Relacao do autor com o repositorio.
+        commit_id: Hash do commit associado ao comentario.
+        line: Linha do arquivo relacionada ao comentario.
+        language: Linguagem inferida ou normalizada para o registro.
+        created_at: Data de criacao quando disponivel; caso contrario, None.
+        project_type: Tipo do repositorio classificado pelo LLM.
+        pr_nature: Natureza da contribuicao classificada pelo LLM.
+        clarity_level: Nivel de clareza da descricao classificado pelo LLM.
+        char_count: Contagem de caracteres do corpo do comentario.
+        word_count: Contagem de palavras do corpo do comentario.
     """
 
     id: int

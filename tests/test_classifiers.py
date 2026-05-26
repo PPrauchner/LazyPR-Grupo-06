@@ -1,6 +1,4 @@
 """
-tests/test_classifiers.py
-==========================
 Testes para services/classifiers.py com mocks de LLM.
 
 Cobertura:

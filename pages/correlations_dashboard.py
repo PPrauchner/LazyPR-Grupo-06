@@ -51,28 +51,36 @@ def render_correlation_dashboard(
 
     with col1:
 
-        st.plotly_chart(
-            correlation_heatmap(
-                language_matrix,
-                "Clareza x Linguagem",
-            ),
-            use_container_width=True,
-        )
+        with st.container(border=True):
+
+            st.plotly_chart(
+                correlation_heatmap(
+                    language_matrix,
+                    "Clareza x Linguagem",
+                ),
+                use_container_width=True,
+            )
 
     with col2:
 
+        with st.container(border=True):
+
+            st.plotly_chart(
+                correlation_heatmap(
+                    project_matrix,
+                    "Clareza x Tipo de Projeto",
+                ),
+                use_container_width=True,
+            )
+
+    st.write("")
+
+    with st.container(border=True):
+
         st.plotly_chart(
             correlation_heatmap(
-                project_matrix,
-                "Clareza x Tipo de Projeto",
+                nature_matrix,
+                "Clareza x Natureza da Contribuição",
             ),
             use_container_width=True,
         )
-
-    st.plotly_chart(
-        correlation_heatmap(
-            nature_matrix,
-            "Clareza x Natureza da Contribuição",
-        ),
-        use_container_width=True,
-    )
