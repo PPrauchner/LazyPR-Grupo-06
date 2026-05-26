@@ -101,7 +101,7 @@ class AnalysisResult(NamedTuple):
     author_association: str
     commit_id: str
     line: int
-    language: str
+    language: str | None
     created_at: str | None
     project_type: ProjectType
     pr_nature: PRNature

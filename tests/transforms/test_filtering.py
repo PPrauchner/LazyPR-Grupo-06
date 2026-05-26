@@ -22,16 +22,16 @@ Não deve:
 from typing import NamedTuple
 
 from core.transforms.filtering import (
-    apply_filters,
+    by_project_type,
+    by_pr_nature,
     by_clarity_level,
     by_language,
-    by_pr_nature,
-    by_project_type,
     compose_predicates,
-    is_in_date_range,
+    apply_filters,
 )
 
 
+# Mock imutável simulando o PRRecord/AnalysisResult gerado pelo pipeline
 class MockResult(NamedTuple):
     """
     Mock imutável simulando AnalysisResult.
@@ -44,154 +44,65 @@ class MockResult(NamedTuple):
     created_at: str = ""
 
 
-def test_by_language():
-    """
-    Valida filtro funcional por linguagem.
-    """
+def test_is_language():
+    predicate = is_language("Python")
 
-    predicate = by_language(
-        ("python",),
-    )
-
-    assert predicate(
-        MockResult(language="Python")
-    ) is True
-
-    assert predicate(
-        MockResult(language="python")
-    ) is True
-
-    assert predicate(
-        MockResult(language="Java")
-    ) is False
+    # Deve ser case insensitive
+    assert predicate(MockResult(language="Python")) is True
+    assert predicate(MockResult(language="python")) is True
+    assert predicate(MockResult(language="Java")) is False
+    assert predicate(MockResult()) is False  # Comportamento seguro com atributo vazio
 
 
-def test_by_project_type():
-    """
-    Valida filtro funcional por tipo de projeto.
-    """
+def test_has_project_type():
+    predicate = has_project_type("biblioteca")
 
-    predicate = by_project_type(
-        ("framework",),
-    )
-
-    assert predicate(
-        MockResult(project_type="framework")
-    ) is True
-
-    assert predicate(
-        MockResult(project_type="library")
-    ) is False
+    assert predicate(MockResult(project_type="biblioteca")) is True
+    assert predicate(MockResult(project_type="framework")) is False
 
 
-def test_by_pr_nature():
-    """
-    Valida filtro funcional por natureza do PR.
-    """
+def test_has_pr_nature():
+    predicate = has_pr_nature("bug_fix")
 
-    predicate = by_pr_nature(
-        ("bug_fix",),
-    )
-
-    assert predicate(
-        MockResult(pr_nature="bug_fix")
-    ) is True
-
-    assert predicate(
-        MockResult(pr_nature="feature")
-    ) is False
+    assert predicate(MockResult(pr_nature="bug_fix")) is True
+    assert predicate(MockResult(pr_nature="feature")) is False
 
 
-def test_by_clarity_level():
-    """
-    Valida filtro funcional por nível de clareza.
-    """
+def test_has_clarity_level():
+    predicate = has_clarity_level("excelente")
 
-    predicate = by_clarity_level(
-        ("good",),
-    )
-
-    assert predicate(
-        MockResult(clarity_level="good")
-    ) is True
-
-    assert predicate(
-        MockResult(clarity_level="poor")
-    ) is False
+    assert predicate(MockResult(clarity_level="excelente")) is True
+    assert predicate(MockResult(clarity_level="insuficiente")) is False
 
 
 def test_is_in_date_range():
-    """
-    Valida filtro funcional por intervalo de datas.
-    """
+    predicate = is_in_date_range("2025-01-01", "2025-12-31")
 
-    predicate = is_in_date_range(
-        "2025-01-01",
-        "2025-12-31",
-    )
+    # Dentro do intervalo
+    assert predicate(MockResult(created_at="2025-06-15T10:00:00Z")) is True
+    assert predicate(MockResult(created_at="2025-01-01T00:00:00Z")) is True
+    assert predicate(MockResult(created_at="2025-12-31T23:59:59Z")) is True
 
-    assert predicate(
-        MockResult(
-            created_at="2025-06-15",
-        )
-    ) is True
-
-    assert predicate(
-        MockResult(
-            created_at="2024-01-01",
-        )
-    ) is False
+    # Fora do intervalo
+    assert predicate(MockResult(created_at="2024-12-31T23:59:59Z")) is False
+    assert predicate(MockResult(created_at="2026-01-01T00:00:00Z")) is False
 
 
-def test_compose_predicates():
-    """
-    Valida composição funcional de predicados.
-    """
-
-    predicate = compose_predicates(
-        (
-            by_language(("python",)),
-            by_pr_nature(("bug_fix",)),
-        )
-    )
-
-    assert predicate(
-        MockResult(
-            language="python",
-            pr_nature="bug_fix",
-        )
-    ) is True
-
-    assert predicate(
-        MockResult(
-            language="java",
-            pr_nature="bug_fix",
-        )
-    ) is False
+def test_build_filter_empty():
+    """Se nenhum filtro for passado, deve aprovar tudo."""
+    predicate = build_filter()
+    assert predicate(MockResult()) is True
 
 
-def test_apply_filters():
-    """
-    Valida aplicação lazy de filtros.
-    """
+def test_build_filter_composition():
+    """Valida a conjunção lógica (AND) de múltiplos filtros puros."""
+    predicate = build_filter(is_language("Python"), has_pr_nature("bug_fix"))
 
-    records = (
-        MockResult(language="Python"),
-        MockResult(language="Java"),
-    )
+    # Passa em ambos
+    assert predicate(MockResult(language="python", pr_nature="bug_fix")) is True
 
-    filtered = apply_filters(
-        (
-            by_language(("python",)),
-        ),
-        records,
-    )
+    # Falha em um (Natureza diferente)
+    assert predicate(MockResult(language="Python", pr_nature="feature")) is False
 
-    filtered_records = tuple(filtered)
-
-    assert len(filtered_records) == 1
-
-    assert (
-        filtered_records[0].language
-        == "Python"
-    )
+    # Falha no outro (Linguagem diferente)
+    assert predicate(MockResult(language="Java", pr_nature="bug_fix")) is False

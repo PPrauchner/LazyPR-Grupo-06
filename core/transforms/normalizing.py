@@ -31,7 +31,7 @@ Relacionado a:
 from __future__ import annotations
 
 import functools
-from typing import Optional
+from typing import Optional, NamedTuple
 
 from core.models.analysis_result import AnalysisResult
 from core.models.pr_record import PRRecord
