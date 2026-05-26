@@ -5,9 +5,9 @@ Testes unitários para módulo de hashing.
 """
 
 import pytest
-
+import io
 from core.models.pr_record import PRRecord
-from utils.hashing import hash_content, hash_record
+from utils.hashing import hash_content, hash_record,hash_file_stream
 
 
 class TestHashContent:
@@ -117,6 +117,62 @@ class TestHashRecord:
         )
         hash_result = hash_record(pr)
         assert len(hash_result) == 64
+
+class TestHashFileStream:
+    
+
+    def test_hash_file_stream_correctness(self):
+        """Calcula o hash corretamente em chunks e garante a reconstrução das linhas via generator."""
+        conteudo_arquivo = "linha 1\nlinha 2\nlinha 3"
+        stream_simulado = io.StringIO(conteudo_arquivo)
+
+        digest, gerador_linhas = hash_file_stream(stream_simulado)
+
+        # 1. Verifica se o gerador consome e retorna as linhas corretamente de forma preguiçosa
+        linhas = list(gerador_linhas)
+        assert linhas == ["linha 1\n", "linha 2\n", "linha 3"]
+
+        # 2. Verifica se o hash calculado do stream é matematicamente idêntico ao do texto todo em memória
+        hash_esperado = hash_content(conteudo_arquivo)
+        assert digest == hash_esperado
+
+    def test_hash_file_stream_empty(self):
+        """Garante que um stream vazio gera o hash correto para string vazia e um gerador vazio."""
+        stream_vazio = io.StringIO("")
+        digest, gerador = hash_file_stream(stream_vazio)
+        
+        assert list(gerador) == []
+        assert digest == hash_content("")
+        
+class TestHashingEncodingResilience:
+
+
+    def test_hash_content_with_emojis_and_special_chars(self):
+        """Garante que a codificação UTF-8 forçada suporta Emojis, Cyrillic e acentuação."""
+        conteudo_complexo = "Bugfix no core 🐛. Alteração em repositório chinês (测试) e russo (тест)."
+        
+        try:
+            hash_result = hash_content(conteudo_complexo)
+        except UnicodeEncodeError:
+            pytest.fail("hash_content falhou ao codificar caracteres especiais para UTF-8.")
+            
+        assert len(hash_result) == 64
+        assert isinstance(hash_result, str)
+
+    def test_hash_file_stream_ignores_multibyte_chunk_issues(self):
+        """Valida se o cálculo do hash stream lida bem com strings multi-byte."""
+        conteudo = "Primeira linha 🛠️\nSegunda linha: áéíóú\n"
+        stream_simulado = io.StringIO(conteudo)
+
+        digest, gerador = hash_file_stream(stream_simulado)
+        
+        # Verifica se o gerador não corrompeu os caracteres na hora de reconstruir a string
+        linhas = list(gerador)
+        assert linhas[0] == "Primeira linha 🛠️\n"
+        assert linhas[1] == "Segunda linha: áéíóú\n"
+        
+        # O digest deve ser idêntico ao carregamento completo em memória
+        assert digest == hash_content(conteudo)
 
 
 if __name__ == "__main__":

@@ -1,5 +1,26 @@
-import pytest
+"""
+Testes unitários dos predicados funcionais utilizados
+no sistema de filtragem global do dashboard.
+
+Responsabilidades:
+    - Validar filtros por:
+        * linguagem
+        * tipo de projeto
+        * natureza da contribuição
+        * nível de clareza
+        * intervalo de datas
+    - Validar composição funcional de predicados
+    - Garantir aplicação lazy dos filtros
+    - Preservar comportamento determinístico
+
+Não deve:
+    - Realizar I/O
+    - Inicializar Streamlit
+    - Modificar registros
+"""
+
 from typing import NamedTuple
+
 from core.transforms.filtering import (
     by_project_type,
     by_pr_nature,
@@ -12,6 +33,10 @@ from core.transforms.filtering import (
 
 # Mock imutável simulando o PRRecord/AnalysisResult gerado pelo pipeline
 class MockResult(NamedTuple):
+    """
+    Mock imutável simulando AnalysisResult.
+    """
+
     language: str = ""
     project_type: str = ""
     pr_nature: str = ""

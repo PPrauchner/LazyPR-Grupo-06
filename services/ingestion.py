@@ -37,6 +37,7 @@ import json
 import hashlib
 from typing import BinaryIO, Iterator, Union, Any
 from contextlib import contextmanager
+from urllib.parse import urlparse
 
 from core.models.pr_record import PRRecord
 
@@ -61,6 +62,54 @@ def _get_file_buffer(file_target: Union[str, BinaryIO]) -> Iterator[BinaryIO]:
             yield f
     else:
         yield file_target
+
+
+def _extract_repo_from_url(html_url: str) -> str:
+    """Extrai o campo 'repo' no formato 'owner/name' da html_url do GitHub.
+
+    Args:
+        html_url: URL completa do comentário (ex: "https://github.com/golang/go/pull/...").
+
+    Returns:
+        String no formato "owner/name", ou string vazia se a URL for inválida.
+    """
+    try:
+        parts = urlparse(html_url).path.strip("/").split("/")
+        return f"{parts[0]}/{parts[1]}" if len(parts) >= 2 else ""
+    except Exception:
+        return ""
+
+
+def _map_csv_row(row: dict) -> PRRecord:
+    """Converte linha bruta do CSV do Kaggle para PRRecord com mapeamento explícito.
+
+    O dataset usa 'user' onde PRRecord espera 'author'. Os campos 'repo' e
+    'language' não existem no dataset e são derivados ou preenchidos com None.
+    Os tipos numéricos 'id' e 'line' são convertidos de str para int.
+
+    Args:
+        row: Dicionário com os campos da linha CSV (schema real do Kaggle).
+
+    Returns:
+        PRRecord imutável com campos corretamente mapeados e tipados.
+    """
+    html_url = row.get("html_url", "")
+    raw_line = row.get("line", None)
+
+    return PRRecord(
+        id=int(row.get("id", 0)),
+        html_url=html_url,
+        repo=_extract_repo_from_url(html_url),
+        path=row.get("path", ""),
+        body=row.get("body", ""),
+        diff_hunk=row.get("diff_hunk", ""),
+        author=row.get("user", ""),
+        author_association=row.get("author_association", ""),
+        commit_id=row.get("commit_id", ""),
+        line=int(raw_line) if raw_line else 0,
+        language=row.get("language") or None,
+        created_at=row.get("created_at") or None,
+    )
 
 
 def read_header_lazily(file_target: Union[str, BinaryIO]) -> tuple[str, ...]:
@@ -127,7 +176,7 @@ def stream_csv(
         reader = csv.DictReader(lazy_decoder_and_hasher())
         
         for row in reader:
-            yield PRRecord(**row)
+            yield _map_csv_row(row)
 
 
 def stream_json(
@@ -160,4 +209,4 @@ def stream_json(
                 continue
                 
             row_data = json.loads(line_bytes.decode("utf-8", errors="replace"))
-            yield PRRecord(**row_data)
+            yield _map_csv_row(row_data)

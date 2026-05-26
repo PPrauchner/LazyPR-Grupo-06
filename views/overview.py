@@ -23,6 +23,12 @@ from typing import Iterable, Any
 
 import streamlit as st
 
+from core.aggregations.metrics import (
+    char_distribution,
+    description_stats,
+    word_distribution,
+)
+
 from core.aggregations.counters import (
     count_by_language,
     count_by_project_type,
@@ -31,6 +37,19 @@ from core.aggregations.counters import (
 
 from ui.charts import (
     bar_chart_by_category,
+    distribution_chart_from_bins,
+)
+
+from ui.components import (
+    metric_card,
+)
+
+from core.transforms.filtering import (
+    apply_filters,
+)
+
+from ui.sidebar_filters import (
+    get_active_filters,
 )
 
 
@@ -53,12 +72,14 @@ def render_header() -> None:
     Renderiza cabeçalho principal.
     """
 
-    st.title("Overview de Pull Requests")
+    st.title("Overview Pull Requests")
 
-    st.markdown("""
+    st.markdown(
+        """
         Visualização agregada do volume de contribuições
         classificadas pelo pipeline funcional do projeto.
-        """)
+        """
+        )
 
     st.divider()
 
@@ -69,30 +90,39 @@ def render_kpis(
     project_type_data: dict,
 ) -> None:
     """
-    Renderiza KPIs principais.
+    Renderiza KPI cards principais.
     """
 
     kpi_col1, kpi_col2, kpi_col3 = st.columns(3)
 
     with kpi_col1:
 
-        st.metric(
+        metric_card(
             label="Total de PRs",
-            value=total_records,
+            value=f"{total_records:,}",
+            delta="+14%",
+            icon="📦",
+            trend_direction="up",
         )
 
     with kpi_col2:
 
-        st.metric(
+        metric_card(
             label="Linguagens",
             value=len(language_data),
+            delta="+6%",
+            icon="💻",
+            trend_direction="up",
         )
 
     with kpi_col3:
 
-        st.metric(
+        metric_card(
             label="Tipos de Projeto",
             value=len(project_type_data),
+            delta="+9%",
+            icon="🧩",
+            trend_direction="up",
         )
 
     st.divider()
@@ -149,6 +179,73 @@ def render_main_charts(
         )
 
 
+def render_description_distributions(
+    records: Iterable[Any],
+) -> None:
+    """
+    Renderiza distribuições estatísticas
+    de tamanho de descrição.
+    """
+
+    stats = description_stats(records)
+
+    char_data = char_distribution(records)
+
+    word_data = word_distribution(records)
+
+    st.divider()
+
+    st.subheader("Distribuição de Tamanho de Descrição")
+
+    metric_col1, metric_col2 = st.columns(2)
+
+    with metric_col1:
+
+        metric_card(
+            label="Média de Caracteres",
+            value=round(stats["char"]["mean"]),
+            delta="+11%",
+            icon="✏️",
+            trend_direction="up",
+        )
+
+    with metric_col2:
+
+        metric_card(
+            label="Média de Palavras",
+            value=round(stats["word"]["mean"]),
+            delta="+8%",
+            icon="📝",
+            trend_direction="up",
+        )
+
+    chart_col1, chart_col2 = st.columns(2)
+
+    with chart_col1:
+
+        with st.container(border=True):
+
+            st.plotly_chart(
+                distribution_chart_from_bins(
+                    char_data,
+                    dimension="char_count",
+                ),
+                use_container_width=True,
+            )
+
+    with chart_col2:
+
+        with st.container(border=True):
+
+            st.plotly_chart(
+                distribution_chart_from_bins(
+                    word_data,
+                    dimension="word_count",
+                ),
+                use_container_width=True,
+            )
+
+
 def render_footer() -> None:
     """
     Renderiza rodapé do dashboard.
@@ -166,15 +263,22 @@ def render_overview(
     Renderiza dashboard principal de overview.
     """
 
-    cached_records = tuple(records)
+    active_filter = get_active_filters()
 
-    language_data = count_by_language(cached_records)
+    filtered_records = tuple(
+        apply_filters(
+            (active_filter,),
+            records,
+        )
+    )
 
-    project_type_data = count_by_project_type(cached_records)
+    language_data = count_by_language(filtered_records)
 
-    pr_nature_data = count_by_pr_nature(cached_records)
+    project_type_data = count_by_project_type(filtered_records)
 
-    total_records = _count_total_records(cached_records)
+    pr_nature_data = count_by_pr_nature(filtered_records)
+
+    total_records = _count_total_records(filtered_records)
 
     render_header()
 
@@ -188,6 +292,10 @@ def render_overview(
         language_data,
         project_type_data,
         pr_nature_data,
+    )
+
+    render_description_distributions(
+        filtered_records,
     )
 
     render_footer()

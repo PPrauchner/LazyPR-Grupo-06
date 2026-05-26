@@ -36,7 +36,6 @@ from core.models.pr_record import PRRecord
 from core.models.analysis_result import AnalysisResult
 from core.pipeline.composer import pipe
 
-
 # ---------------------------------------------------------------------------
 # Métricas de Execução (Imutável)
 # ---------------------------------------------------------------------------
@@ -70,6 +69,7 @@ EnrichmentStage = Callable[[Iterable[PRRecord]], Generator[AnalysisResult, None,
 class PipelineConfig(NamedTuple):
     """Configuração do pipeline com etapas ativáveis."""
 
+    enable_cleaning: bool = True
     enable_normalization: bool = True
     enable_filtering: bool = True
     enable_classification: bool = True
@@ -121,19 +121,30 @@ def run_pipeline(
         'library'
     """
     # Importar aqui para evitar ciclos (core modules são puras)
-    from core.transforms.normalizing import normalize_pr_record
+    from core.transforms.cleaning import (
+        clean_pr_record,
+    )
+
+    from core.transforms.normalizing import (
+        normalize_pr_record,
+    )
     from services.classifiers import classify_project_type
 
     # Pipeline configurável: cada etapa opcional
     stream = source
 
-    # Etapa 1: Normalização (sempre ativa se habilitada)
+    # Etapa 1: Limpeza
+    if config.enable_cleaning:
+
+        stream = (clean_pr_record(record) for record in stream)
+
+    # Etapa 2: Normalização (sempre ativa se habilitada)
     if config.enable_normalization:
         # Mapeia normalize_pr_record sobre cada PR
         # (nota: normalize_pr_record não filtra, então não precisa ser generator)
         stream = (normalize_pr_record(record) for record in stream)
 
-    # Etapa 2: Filtragem (quando habilitada)
+    # Etapa 3: Filtragem (quando habilitada)
     # Nota: Por enquanto não há filtros padrão; em pages/sidebar_filters.py
     # há get_active_filters() que constrói predicados via build_filter()
     if config.enable_filtering:
@@ -144,7 +155,7 @@ def run_pipeline(
         # stream = (r for r in stream if filter_predicate(r))
         pass
 
-    # Etapa 3: Classificação (core da Phase 2/3)
+    # Etapa 4: Classificação (core da Phase 2/3)
     if config.enable_classification:
         # Aplicar classificadores via composição
         # classify_project_type já retorna Generator[AnalysisResult]
@@ -152,7 +163,6 @@ def run_pipeline(
     else:
         # Se classification desabilitada, converter PRRecord para stub AnalysisResult
         # (com classifications vazias)
-        from core.transforms.normalizing import calculate_char_count, calculate_word_count
 
         def _stub_analysis_result(record: PRRecord) -> AnalysisResult:
             return AnalysisResult(
@@ -171,8 +181,8 @@ def run_pipeline(
                 project_type="other",
                 pr_nature="other",
                 clarity_level="other",
-                char_count=calculate_char_count(record.body),
-                word_count=calculate_word_count(record.body),
+                char_count=len(record.body),
+                word_count=len(record.body.split()),
             )
 
         stream = (_stub_analysis_result(record) for record in stream)

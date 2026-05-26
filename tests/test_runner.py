@@ -21,6 +21,7 @@ from core.pipeline.runner import (
     PipelineMetrics,
 )
 from core.pipeline.composer import pipe, compose, identity
+from utils.memoization import clear_cache
 
 # ---------------------------------------------------------------------------
 # Fixtures
