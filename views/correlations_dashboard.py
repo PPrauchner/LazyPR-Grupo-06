@@ -18,6 +18,13 @@ from core.aggregations.correlations import (
 from ui.charts import (
     correlation_heatmap,
 )
+from core.transforms.filtering import (
+    apply_filters,
+)
+
+from ui.sidebar_filters import (
+    get_active_filters,
+)
 
 
 def render_correlation_dashboard(
@@ -27,13 +34,20 @@ def render_correlation_dashboard(
     Renderiza dashboard de correlação.
     """
 
-    cached_records = tuple(records)
+    active_filter = get_active_filters()
 
-    language_matrix = clarity_by_language(cached_records)
+    filtered_records = tuple(
+        apply_filters(
+            (active_filter,),
+            records,
+        )
+    )
 
-    project_matrix = clarity_by_project_type(cached_records)
+    language_matrix = clarity_by_language(filtered_records)
 
-    nature_matrix = clarity_by_pr_nature(cached_records)
+    project_matrix = clarity_by_project_type(filtered_records)
+
+    nature_matrix = clarity_by_pr_nature(filtered_records)
 
     st.title("Correlação Multidimensional")
 

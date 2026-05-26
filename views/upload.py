@@ -49,7 +49,7 @@ def _validate_schema(uploaded_file: UploadedFile) -> bool:
     return True
 
 
-def render() -> None:
+def render_upload_page() -> None:
     """
     Renderiza os componentes visuais da página e gerencia o estado do fluxo.
 
@@ -74,6 +74,3 @@ def render() -> None:
     if st.button("Iniciar Análise 🚀"):
         st.session_state["dataset_file"] = uploaded_file
         st.switch_page("pages/correlations.py")
-
-
-render()

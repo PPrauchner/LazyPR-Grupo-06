@@ -26,26 +26,99 @@ Relacionado a:
     - HU 09 (exportação acessível pela interface)
     - Regra Geral 08 (interface gráfica obrigatória)
 """
+
 import streamlit as st
 from typing import Any, Iterable
+from ui.theme import (
+    get_theme,
+)
 
 from core.models.analysis_result import AnalysisResult
 from services.exporters import to_download_bytes
 
 
-def metric_card(label: str, value: Any, delta: Any = None) -> None:
-    """Renderiza um cartão de métrica (KPI) de alto nível na interface.
-
-    Args:
-        label (str): Título ou descrição da métrica exibida.
-        value (Any): Valor numérico ou textual exibido em destaque.
-        delta (Any, opcional): Indicador de variação positivo ou negativo.
-            Quando positivo, exibido em verde; quando negativo, em vermelho.
-
-    Returns:
-        None: Função de efeito colateral — renderiza no Streamlit.
+def metric_card(
+    label: str,
+    value: Any,
+    delta: str = "",
+    icon: str = "📊",
+    trend_direction: str = "up",
+) -> None:
     """
-    st.metric(label=label, value=value, delta=delta)
+    Renderiza KPI card moderno reutilizável.
+    """
+
+    theme = get_theme()
+
+    trend_color = theme["success"] if trend_direction == "up" else theme["error"]
+
+    trend_icon = "↑" if trend_direction == "up" else "↓"
+
+    st.markdown(
+        f"""
+        <div
+            style="
+                background: linear-gradient(
+                    135deg,
+                    {theme['card']},
+                    rgba(124,58,237,0.10)
+                );
+                border: 1px solid {theme['border']};
+                border-radius: 20px;
+                padding: 1.2rem;
+                margin-bottom: 1rem;
+                box-shadow: 0 0 25px rgba(124,58,237,0.18);
+                transition: 0.2s ease;
+                cursor: pointer;
+            "
+        >
+
+            <div
+                style="
+                    display: flex;
+                    justify-content: space-between;
+                    align-items: center;
+                "
+            >
+
+                <div
+                    style="
+                        color: {theme['muted_text']};
+                        font-size: 0.95rem;
+                        font-weight: 600;
+                    "
+                >
+                    {icon} {label}
+                </div>
+
+            </div>
+
+            <div
+                style="
+                    margin-top: 1rem;
+                    font-size: 2rem;
+                    font-weight: 800;
+                    color: {theme['text']};
+                "
+            >
+                {value}
+            </div>
+
+            <div
+                style="
+                    margin-top: 0.5rem;
+                    color: {trend_color};
+                    font-size: 0.9rem;
+                    font-weight: 700;
+                "
+            >
+                {trend_icon} {delta}
+            </div>
+
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
 
 
 def data_table(records: Iterable[AnalysisResult]) -> None:

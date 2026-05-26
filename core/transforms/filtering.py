@@ -28,6 +28,7 @@ Relacionado a:
     - Regra Funcional 07 (filter(), lambda)
     - Conceito-Chave 07 (lambda para filtros inline)
 """
+
 from collections.abc import Callable, Iterable
 from functools import reduce
 
@@ -75,7 +76,7 @@ def by_project_type(project_types: tuple[str, ...]) -> Predicate:
 def by_pr_nature(pr_natures: tuple[str, ...]) -> Predicate:
     """
     Cria um predicado para filtrar registros por natureza da contribuição.
-    
+
     Os valores devem corresponder ao campo pr_nature definido em AnalysisResult,
     como "bug_fix", "feature", "refactoring", "documentation" e "other".
 
@@ -107,6 +108,29 @@ def by_clarity_level(clarity_levels: tuple[str, ...]) -> Predicate:
     """
     allowed = frozenset(map(str.lower, clarity_levels))
     return lambda record: record.clarity_level.lower() in allowed
+
+
+def is_in_date_range(
+    start_date: str,
+    end_date: str,
+) -> Predicate:
+    """
+    Cria predicado para filtrar registros
+    dentro de um intervalo de datas.
+
+    Args:
+        start_date:
+            Data inicial no formato YYYY-MM-DD.
+
+        end_date:
+            Data final no formato YYYY-MM-DD.
+
+    Returns:
+        Predicate que valida se o registro
+        está dentro do intervalo informado.
+    """
+
+    return lambda record: start_date <= record.created_at <= end_date
 
 
 def compose_predicates(predicates: Iterable[Predicate]) -> Predicate:

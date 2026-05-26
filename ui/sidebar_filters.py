@@ -15,15 +15,19 @@ Não deve:
 """
 
 import streamlit as st
+from ui.layout import (
+    render_section_title,
+    render_dataset_card,
+)
 
 from core.transforms.filtering import (
     Predicate,
-    build_filter,
-    has_clarity_level,
-    has_pr_nature,
-    has_project_type,
+    by_clarity_level,
+    by_language,
+    by_pr_nature,
+    by_project_type,
+    compose_predicates,
     is_in_date_range,
-    is_language,
 )
 
 LANGUAGES = (
@@ -57,10 +61,11 @@ CLARITY_LEVELS = (
 )
 
 PAGES = (
-    "Upload",
-    "Overview",
-    "Correlação",
-    "Exportação",
+    "🏠 Home",
+    "📂 Upload",
+    "📊 Overview",
+    "🔥 Correlação",
+    "💾 Exportação",
 )
 
 
@@ -107,28 +112,28 @@ def get_active_filters() -> Predicate:
 
     active_predicates.extend(
         map(
-            is_language,
+            lambda language: by_language((language,)),
             selected_languages,
         )
     )
 
     active_predicates.extend(
         map(
-            has_project_type,
+            lambda project_type: by_project_type((project_type,)),
             selected_project_types,
         )
     )
 
     active_predicates.extend(
         map(
-            has_pr_nature,
+            lambda pr_nature: by_pr_nature((pr_nature,)),
             selected_natures,
         )
     )
 
     active_predicates.extend(
         map(
-            has_clarity_level,
+            lambda clarity: by_clarity_level((clarity,)),
             selected_clarity,
         )
     )
@@ -142,8 +147,8 @@ def get_active_filters() -> Predicate:
             )
         )
 
-    return build_filter(
-        *active_predicates,
+    return compose_predicates(
+        active_predicates,
     )
 
 
@@ -154,21 +159,37 @@ def render_sidebar() -> dict:
 
     with st.sidebar:
 
-        st.title("RP3 Analytics")
+        if "dark_mode" not in st.session_state:
+
+            st.session_state["dark_mode"] = True
+
+        theme_toggle = st.toggle(
+            "🌙 Tema Escuro",
+            key="dark_mode",
+        )
+
+        st.caption("Alternar aparência visual do dashboard.")
+
+        st.session_state["theme_mode"] = "dark" if theme_toggle else "light"
+
+        st.title("🚀 LazyPR")
 
         st.markdown("""
-            Dashboard funcional para análise
-            de Pull Requests do GitHub.
-            """)
+          Análise semântica de Pull Requests
+          com Programação Funcional e LLMs.
+          """)
 
         st.divider()
 
-        selected_page = st.selectbox(
-            "Página",
+        render_section_title("NAVEGAÇÃO")
+
+        selected_page = st.radio(
+            "Navegação",
             PAGES,
+            label_visibility="collapsed",
         )
 
-        st.subheader("Filtros")
+        render_section_title("FILTROS GLOBAIS")
 
         selected_languages = st.multiselect(
             "Linguagens",
@@ -215,6 +236,21 @@ def render_sidebar() -> dict:
         st.divider()
 
         st.caption("Projeto desenvolvido com " "Programação Funcional.")
+
+        dataset_name = st.session_state.get(
+            "dataset_name",
+            "Nenhum dataset",
+        )
+
+        analysis_results = st.session_state.get(
+            "analysis_results",
+            (),
+        )
+
+        render_dataset_card(
+            dataset_name,
+            len(tuple(analysis_results)),
+        )
 
     return {
         "page": selected_page,

@@ -7,7 +7,7 @@ Responsabilidades:
     - Exibir KPIs de resumo da análise (total de PRs, clareza alta).
     - Renderizar prévia dos dados via `ui/components.data_table()`.
     - Disponibilizar botões de download CSV e JSON via `ui/components.download_buttons()`.
-    - Ler exclusivamente de `st.session_state["results"]` — nunca acessar o dataset bruto.
+    -Recebe os resultados processados via parâmetro, materializando em tupla imutável para múltiplos consumos.
 
 Não deve:
     - Realizar contagens, agregações ou transformações de dados diretamente.
@@ -24,10 +24,10 @@ import streamlit as st
 from core.aggregations.counters import count_by
 from ui.components import data_table, download_buttons, metric_card, status_banner
 
-st.set_page_config(page_title="LazyPR - Exportar", page_icon="💾")
 
-
-def render() -> None:
+def render_export_page(
+    results,
+) -> None:
     """Orquestra a renderização da página de exportação.
 
     Lê os resultados de `st.session_state["results"]`, materializa em tupla
@@ -42,16 +42,16 @@ def render() -> None:
     """
     st.title("💾 Exportar Resultados")
 
-    if "results" not in st.session_state or not st.session_state["results"]:
+    if not results:
+
         status_banner(
-            "Nenhum dado processado disponível. "
-            "Por favor, retorne à página de Upload e inicie uma análise.",
+            "Nenhum resultado disponível.",
             status_type="warning",
         )
-        st.stop()
+
         return
 
-    results = tuple(st.session_state["results"])
+    results = tuple(results)
 
     st.subheader("Resumo do Arquivo")
     col1, col2, _ = st.columns(3)
@@ -72,6 +72,3 @@ def render() -> None:
 
     st.subheader("Opções de Download")
     download_buttons(results)
-
-
-render()
