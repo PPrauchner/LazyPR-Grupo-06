@@ -42,6 +42,8 @@ from ui.charts import (
 
 from ui.components import (
     metric_card,
+    chart_container_start,
+    chart_container_end,
 )
 
 from core.transforms.filtering import (
@@ -74,12 +76,10 @@ def render_header() -> None:
 
     st.title("Overview Pull Requests")
 
-    st.markdown(
-        """
+    st.markdown("""
         Visualização agregada do volume de contribuições
         classificadas pelo pipeline funcional do projeto.
-        """
-        )
+        """)
 
     st.divider()
 
@@ -141,42 +141,48 @@ def render_main_charts(
 
     with col1:
 
-        with st.container(border=True):
-
-            st.plotly_chart(
-                bar_chart_by_category(
-                    language_data,
-                    title="PRs por Linguagem",
-                    x_title="Linguagem",
-                ),
-                use_container_width=True,
-            )
-
-    with col2:
-
-        with st.container(border=True):
-
-            st.plotly_chart(
-                bar_chart_by_category(
-                    project_type_data,
-                    title="PRs por Tipo de Projeto",
-                    x_title="Tipo de Projeto",
-                ),
-                use_container_width=True,
-            )
-
-    st.write("")
-
-    with st.container(border=True):
+        chart_container_start()
 
         st.plotly_chart(
             bar_chart_by_category(
-                pr_nature_data,
-                title="PRs por Natureza da Contribuição",
-                x_title="Natureza",
+                language_data,
+                title="PRs por Linguagem",
+                x_title="Linguagem",
             ),
             use_container_width=True,
         )
+
+        chart_container_end()
+
+    with col2:
+
+        chart_container_start()
+
+        st.plotly_chart(
+            bar_chart_by_category(
+                project_type_data,
+                title="PRs por Tipo de Projeto",
+                x_title="Tipo de Projeto",
+            ),
+            use_container_width=True,
+        )
+
+        chart_container_end()
+
+    st.write("")
+
+    chart_container_start()
+
+    st.plotly_chart(
+        bar_chart_by_category(
+            pr_nature_data,
+            title="PRs por Natureza da Contribuição",
+            x_title="Natureza",
+        ),
+        use_container_width=True,
+    )
+
+    chart_container_end()
 
 
 def render_description_distributions(
@@ -223,27 +229,31 @@ def render_description_distributions(
 
     with chart_col1:
 
-        with st.container(border=True):
+        chart_container_start()
 
-            st.plotly_chart(
-                distribution_chart_from_bins(
-                    char_data,
-                    dimension="char_count",
-                ),
-                use_container_width=True,
-            )
+        st.plotly_chart(
+            distribution_chart_from_bins(
+                char_data,
+                dimension="char_count",
+            ),
+            use_container_width=True,
+        )
+
+        chart_container_end()
 
     with chart_col2:
 
-        with st.container(border=True):
+        chart_container_start()
 
-            st.plotly_chart(
-                distribution_chart_from_bins(
-                    word_data,
-                    dimension="word_count",
-                ),
-                use_container_width=True,
-            )
+        st.plotly_chart(
+            distribution_chart_from_bins(
+                word_data,
+                dimension="word_count",
+            ),
+            use_container_width=True,
+        )
+
+        chart_container_end()
 
 
 def render_footer() -> None:

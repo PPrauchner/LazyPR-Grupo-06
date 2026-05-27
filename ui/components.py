@@ -121,6 +121,45 @@ def metric_card(
     )
 
 
+def chart_container_start() -> None:
+    """
+    Inicia container visual reutilizável para gráficos.
+    """
+
+    theme = get_theme()
+
+    st.markdown(
+        f"""
+        <div
+            style="
+                padding: 1.2rem;
+                border-radius: 22px;
+                background: linear-gradient(
+                    135deg,
+                    {theme['card']},
+                    rgba(124,58,237,0.05)
+                );
+                border: 1px solid {theme['border']};
+                box-shadow: 0 0 20px rgba(124,58,237,0.08);
+                margin-bottom: 1rem;
+            "
+        >
+        """,
+        unsafe_allow_html=True,
+    )
+
+
+def chart_container_end() -> None:
+    """
+    Finaliza container visual reutilizável.
+    """
+
+    st.markdown(
+        "</div>",
+        unsafe_allow_html=True,
+    )
+
+
 def data_table(records: Iterable[AnalysisResult]) -> None:
     """Renderiza uma tabela interativa para visualização dos registros filtrados.
 
