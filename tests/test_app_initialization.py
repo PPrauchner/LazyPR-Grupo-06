@@ -8,19 +8,19 @@ Responsabilidades:
     - Verificar inicialização dos módulos
 """
 
-from pages.correlations_dashboard import (
+from views.correlations_dashboard import (
     render_correlation_dashboard,
 )
 
-from pages.export import (
+from views.export import (
     render_export_page,
 )
 
-from pages.overview import (
+from views.overview import (
     render_overview,
 )
 
-from pages.upload import (
+from views.upload import (
     render_upload_page,
 )
 
