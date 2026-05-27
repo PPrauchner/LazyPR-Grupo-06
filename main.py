@@ -21,6 +21,10 @@ from ui.theme import (
     apply_theme,
 )
 
+from views.home import (
+    render_home,
+)
+
 from views.overview import (
     render_overview,
 )
@@ -62,7 +66,11 @@ filters = render_sidebar()
 
 page = filters["page"]
 
-if page == "📂 Upload":
+if page == "🏠 Home":
+
+    render_home(records)
+
+elif page == "📂 Upload":
 
     render_upload_page()
 
