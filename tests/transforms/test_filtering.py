@@ -1,5 +1,26 @@
-import pytest
+"""
+Testes unitários dos predicados funcionais utilizados
+no sistema de filtragem global do dashboard.
+
+Responsabilidades:
+    - Validar filtros por:
+        * linguagem
+        * tipo de projeto
+        * natureza da contribuição
+        * nível de clareza
+        * intervalo de datas
+    - Validar composição funcional de predicados
+    - Garantir aplicação lazy dos filtros
+    - Preservar comportamento determinístico
+
+Não deve:
+    - Realizar I/O
+    - Inicializar Streamlit
+    - Modificar registros
+"""
+
 from typing import NamedTuple
+
 from core.transforms.filtering import (
     by_language,
     by_project_type,
@@ -25,37 +46,41 @@ class MockResult(NamedTuple):
     created_at: str = ""
 
 
-# --- Testes de Helpers Individuais ---
-
 def test_is_language():
     predicate = is_language("Python")
+
+    # Deve ser case insensitive
     assert predicate(MockResult(language="Python")) is True
     assert predicate(MockResult(language="python")) is True
     assert predicate(MockResult(language="Java")) is False
 
 
+
 def test_has_project_type():
-    predicate = has_project_type("library")
-    assert predicate(MockResult(project_type="library")) is True
+    predicate = has_project_type("biblioteca")
+
+    assert predicate(MockResult(project_type="biblioteca")) is True
     assert predicate(MockResult(project_type="framework")) is False
 
 
 def test_has_pr_nature():
     predicate = has_pr_nature("bug_fix")
+
     assert predicate(MockResult(pr_nature="bug_fix")) is True
     assert predicate(MockResult(pr_nature="feature")) is False
 
 
 def test_has_clarity_level():
-    predicate = has_clarity_level("excellent")
-    assert predicate(MockResult(clarity_level="excellent")) is True
-    assert predicate(MockResult(clarity_level="insufficient")) is False
+    predicate = has_clarity_level("excelente")
+
+    assert predicate(MockResult(clarity_level="excelente")) is True
+    assert predicate(MockResult(clarity_level="insuficiente")) is False
 
 
 def test_is_in_date_range():
     predicate = is_in_date_range("2025-01-01", "2025-12-31")
 
-    # Dentro do intervalo (usando o formato string da branch development)
+    # Dentro do intervalo
     assert predicate(MockResult(created_at="2025-06-15T10:00:00Z")) is True
     assert predicate(MockResult(created_at="2025-01-01T00:00:00Z")) is True
     assert predicate(MockResult(created_at="2025-12-31T23:59:59Z")) is True

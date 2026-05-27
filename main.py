@@ -17,20 +17,23 @@ Não deve:
 """
 
 import streamlit as st
+from ui.theme import (
+    apply_theme,
+)
 
-from pages.overview import (
+from views.overview import (
     render_overview,
 )
 
-from pages.correlation_dashboard import (
+from views.correlations_dashboard import (
     render_correlation_dashboard,
 )
 
-from pages.upload import (
+from views.upload import (
     render_upload_page,
 )
 
-from pages.export import (
+from views.export import (
     render_export_page,
 )
 
@@ -44,6 +47,12 @@ st.set_page_config(
     layout="wide",
 )
 
+if "theme_mode" not in st.session_state:
+
+    st.session_state["theme_mode"] = "dark"
+
+apply_theme()
+
 records = st.session_state.get(
     "analysis_results",
     (),
@@ -53,18 +62,18 @@ filters = render_sidebar()
 
 page = filters["page"]
 
-if page == "Upload":
+if page == "📂 Upload":
 
     render_upload_page()
 
-elif page == "Overview":
+elif page == "📊 Overview":
 
     render_overview(records)
 
-elif page == "Correlação":
+elif page == "🔥 Correlação":
 
     render_correlation_dashboard(records)
 
-elif page == "Exportação":
+elif page == "💾 Exportação":
 
     render_export_page(records)

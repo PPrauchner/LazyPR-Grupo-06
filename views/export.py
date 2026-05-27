@@ -7,7 +7,7 @@ Responsabilidades:
     - Exibir KPIs de resumo da análise (total de PRs, clareza alta).
     - Renderizar prévia dos dados via `ui/components.data_table()`.
     - Disponibilizar botões de download CSV e JSON via `ui/components.download_buttons()`.
-    - Ler exclusivamente de `st.session_state["results"]` — nunca acessar o dataset bruto.
+    -Recebe os resultados processados via parâmetro, materializando em tupla imutável para múltiplos consumos.
 
 Não deve:
     - Realizar contagens, agregações ou transformações de dados diretamente.

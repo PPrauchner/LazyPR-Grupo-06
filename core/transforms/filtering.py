@@ -45,9 +45,12 @@ def by_project_type(project_types: tuple[str, ...]) -> Predicate:
     return lambda record: record.project_type.lower() in allowed
 
 
-def has_project_type(project_type: str) -> Predicate:
-    """Wrapper para by_project_type que aceita um tipo individual."""
-    return by_project_type((project_type,))
+def by_pr_nature(pr_natures: tuple[str, ...]) -> Predicate:
+    """
+    Cria um predicado para filtrar registros por natureza da contribuição.
+
+    Os valores devem corresponder ao campo pr_nature definido em AnalysisResult,
+    como "bug_fix", "feature", "refactoring", "documentation" e "other".
 
 
 def by_pr_nature(pr_natures: tuple[str, ...]) -> Predicate:
@@ -65,9 +68,32 @@ def by_clarity_level(clarity_levels: tuple[str, ...]) -> Predicate:
     return lambda record: record.clarity_level.lower() in allowed
 
 
-def has_clarity_level(clarity_level: str) -> Predicate:
-    """Wrapper para by_clarity_level que aceita um nível individual."""
-    return by_clarity_level((clarity_level,))
+def is_in_date_range(
+    start_date: str,
+    end_date: str,
+) -> Predicate:
+    """
+    Cria predicado para filtrar registros
+    dentro de um intervalo de datas.
+
+    Args:
+        start_date:
+            Data inicial no formato YYYY-MM-DD.
+
+        end_date:
+            Data final no formato YYYY-MM-DD.
+
+    Returns:
+        Predicate que valida se o registro
+        está dentro do intervalo informado.
+    """
+
+    return lambda record: start_date <= record.created_at <= end_date
+
+
+def compose_predicates(predicates: Iterable[Predicate]) -> Predicate:
+    """
+    Constrói uma nova função pura combinando múltiplos predicados via conjunção lógica (AND).
 
 
 def is_in_date_range(

@@ -1,203 +1,4 @@
 """
-tests/test_classifiers.py
-Testes unitários para services/classifiers.py
-"""
-
-import json
-from unittest.mock import patch
-from dataclasses import dataclass
-
-import pytest
-
-from services.classifiers import (
-    ClarityLevel,
-    ClarityResult,
-    PRNature,
-    PRNatureResult,
-    ProjectType,
-    ProjectTypeResult,
-    classify_clarity,
-    classify_pr_nature,
-    classify_project_type,
-    _parse,
-    _cached_call,
-)
-
-
-@dataclass
-class FakeRecord:
-    body: str = ""
-    repo: str = "org/repo"
-    title: str = "Título padrão do PR"
-    path: str = "src/main.py"
-    diff_hunk: str = "+ linha nova"
-
-
-@pytest.fixture
-def record():
-    return FakeRecord(body="O botão de login não respondia em mobile.")
-
-
-@pytest.fixture
-def records():
-    return [
-        FakeRecord("Novo painel de métricas.", "org/repo"),
-        FakeRecord("CSV vazio em alguns casos.", "org/repo"),
-        FakeRecord("Instruções de instalação.", "org/outro"),
-    ]
-
-
-def test_parse_extrai_campo_corretamente():
-    assert _parse(json.dumps({"nature": "bug_fix"}), "nature") == "bug_fix"
-
-
-def test_parse_normaliza_para_lowercase():
-    assert _parse(json.dumps({"clarity": "Excelente"}), "clarity") == "excelente"
-
-
-def test_parse_espacos_viram_underscore():
-    assert _parse(json.dumps({"nature": "bug fix"}), "nature") == "bug_fix"
-
-
-def test_parse_json_invalido_retorna_vazio():
-    assert _parse("não é json", "nature") == ""
-
-
-def test_parse_campo_ausente_retorna_vazio():
-    assert _parse(json.dumps({"outro": "valor"}), "nature") == ""
-
-
-def test_parse_remove_bloco_markdown():
-    raw = "```json\n" + json.dumps({"clarity": "boa"}) + "\n```"
-    assert _parse(raw, "clarity") == "boa"
-
-
-def test_cached_call_retorna_cache_sem_chamar_llm():
-    with (
-        patch("services.classifiers.get_cache", return_value="cached_value"),
-        patch("services.classifiers.call_llm") as mock_llm,
-    ):
-        assert _cached_call("chave", "prompt") == "cached_value"
-        mock_llm.assert_not_called()
-
-
-def test_cached_call_chama_llm_em_cache_miss():
-    with (
-        patch("services.classifiers.get_cache", return_value=None),
-        patch("services.classifiers.call_llm", return_value="llm_response"),
-        patch("services.classifiers.set_cache") as mock_set,
-    ):
-        assert _cached_call("chave", "prompt") == "llm_response"
-        mock_set.assert_called_once_with("chave", "llm_response")
-
-
-@pytest.mark.parametrize(
-    "value, expected",
-    [
-        ("bug_fix", PRNature.BUG_FIX),
-        ("feature", PRNature.FEATURE),
-        ("refactoring", PRNature.REFACTORING),
-        ("documentation", PRNature.DOCUMENTATION),
-    ],
-)
-def test_classify_pr_nature_mapeia_valores_validos(record, value, expected):
-    with patch(
-        "services.classifiers.get_cache", return_value=json.dumps({"nature": value})
-    ):
-        assert classify_pr_nature(record).nature == expected
-
-
-def test_classify_pr_nature_fallback_para_unknown(record):
-    with patch(
-        "services.classifiers.get_cache",
-        return_value=json.dumps({"nature": "invalido"}),
-    ):
-        assert classify_pr_nature(record).nature == PRNature.UNKNOWN
-
-
-def test_classify_pr_nature_retorna_tipo_correto(record):
-    with patch(
-        "services.classifiers.get_cache", return_value=json.dumps({"nature": "feature"})
-    ):
-        assert isinstance(classify_pr_nature(record), PRNatureResult)
-
-
-@pytest.mark.parametrize(
-    "value, score",
-    [
-        ("insuficiente", 1),
-        ("basica", 2),
-        ("boa", 3),
-        ("excelente", 4),
-    ],
-)
-def test_classify_clarity_score_correto(record, value, score):
-    with patch(
-        "services.classifiers.get_cache", return_value=json.dumps({"clarity": value})
-    ):
-        assert classify_clarity(record).score == score
-
-
-def test_classify_clarity_fallback_para_insuficiente(record):
-    with patch(
-        "services.classifiers.get_cache",
-        return_value=json.dumps({"clarity": "invalido"}),
-    ):
-        assert classify_clarity(record).level == ClarityLevel.INSUFICIENTE
-
-
-def test_classify_clarity_retorna_tipo_correto(record):
-    with patch(
-        "services.classifiers.get_cache",
-        return_value=json.dumps({"clarity": "excelente"}),
-    ):
-        assert isinstance(classify_clarity(record), ClarityResult)
-
-
-def test_classify_project_type_agrupa_por_repositorio(records):
-    with patch(
-        "services.classifiers.get_cache",
-        return_value=json.dumps({"project_type": "api"}),
-    ):
-        assert len(classify_project_type(records)) == 2
-
-
-def test_classify_project_type_mapeia_valor_valido(records):
-    with patch(
-        "services.classifiers.get_cache",
-        return_value=json.dumps({"project_type": "api"}),
-    ):
-        assert all(
-            r.project_type == ProjectType.API for r in classify_project_type(records)
-        )
-
-
-def test_classify_project_type_fallback_para_unknown(records):
-    with patch(
-        "services.classifiers.get_cache",
-        return_value=json.dumps({"project_type": "invalido"}),
-    ):
-        assert all(
-            r.project_type == ProjectType.UNKNOWN
-            for r in classify_project_type(records)
-        )
-
-
-def test_classify_project_type_retorna_tipo_correto(records):
-    with patch(
-        "services.classifiers.get_cache",
-        return_value=json.dumps({"project_type": "library"}),
-    ):
-        assert all(
-            isinstance(r, ProjectTypeResult) for r in classify_project_type(records)
-        )
-
-
-def test_clarity_level_scores():
-    assert ClarityLevel.INSUFICIENTE.score == 1
-    assert ClarityLevel.BASICA.score == 2
-    assert ClarityLevel.BOA.score == 3
-    assert ClarityLevel.EXCELENTE.score == 4
 Testes para services/classifiers.py com mocks de LLM.
 
 Cobertura:
@@ -209,78 +10,89 @@ Cobertura:
 """
 
 import pytest
-from unittest.mock import patch, MagicMock
 from core.models.pr_record import PRRecord
 from services.classifiers import (
-    classify_project_type,
-    classify_pr_nature,
     classify_clarity,
-    _parse_json_response,
-    _build_analysis_result,
-    _extract_field_from_json,
+    classify_pr_nature,
+    classify_project_type,
 )
-from utils.memoization import clear_cache
-
-# ---------------------------------------------------------------------------
-# Fixtures
-# ---------------------------------------------------------------------------
 
 
-@pytest.fixture
-def sample_pr():
-    """Fixture de um PRRecord para testes."""
-    return PRRecord(
+def test_classify_pr_nature_returns_valid_value():
+    """Testa que classify_pr_nature retorna uma string válida."""
+    pr = PRRecord(
         id=1,
-        html_url="https://github.com/golang/go/pull/23805#discussion_r1",
-        repo="golang/go",
-        path="src/math/rand/rand.go",
-        body="This fixes an issue with random number generation.",
-        diff_hunk="@@ -210,6 +210,11 @@",
+        html_url="https://github.com/test/repo/pull/1#discussion_r1",
+        repo="test/repo",
+        path="src/main.py",
+        body="This fixes a critical bug in the login button.",
+        diff_hunk="@@ -10,6 +10,10 @@",
         author="test_user",
         author_association="CONTRIBUTOR",
         commit_id="abc123",
-        line=213,
-        language="go",
-        created_at="2020-01-01T00:00:00Z",
+        line=15,
+        language="python",
+        created_at="2024-01-01T00:00:00Z",
     )
+    result = classify_pr_nature(pr)
+    assert isinstance(result, str)
+    assert result in [
+        "bug_fix",
+        "feature",
+        "refactoring",
+        "documentation",
+        "other",
+        "unknown",
+    ]
 
 
-@pytest.fixture
-def sample_pr_same_repo():
-    """Fixture de um segundo PRRecord no mesmo repositório."""
-    return PRRecord(
-        id=2,
-        html_url="https://github.com/golang/go/pull/23806#discussion_r2",
-        repo="golang/go",
-        path="src/math/rand/rand.go",
-        body="This adds support for new random distributions.",
-        diff_hunk="@@ -220,6 +220,11 @@",
-        author="another_user",
-        author_association="MEMBER",
-        commit_id="def456",
-        line=223,
-        language="go",
-        created_at="2020-01-02T00:00:00Z",
+def test_classify_clarity_returns_valid_value():
+    """Testa que classify_clarity retorna uma string válida."""
+    pr = PRRecord(
+        id=1,
+        html_url="https://github.com/test/repo/pull/1#discussion_r1",
+        repo="test/repo",
+        path="src/main.py",
+        body="This fixes a critical bug in the login button.",
+        diff_hunk="@@ -10,6 +10,10 @@",
+        author="test_user",
+        author_association="CONTRIBUTOR",
+        commit_id="abc123",
+        line=15,
+        language="python",
+        created_at="2024-01-01T00:00:00Z",
     )
+    result = classify_clarity(pr)
+    assert isinstance(result, str)
+    assert result in [
+        "insufficient",
+        "basic",
+        "good",
+        "excellent",
+        "other",
+        "unknown",
+    ]
 
 
-@pytest.fixture
-def sample_pr_different_repo():
-    """Fixture de um PRRecord em repositório diferente."""
-    return PRRecord(
-        id=3,
-        html_url="https://github.com/torvalds/linux/pull/12345#discussion_r3",
-        repo="torvalds/linux",
-        path="drivers/gpu/drm/nouveau/nouveau_drv.c",
-        body="This fixes a GPU driver issue.",
-        diff_hunk="@@ -100,6 +100,11 @@",
-        author="kernel_dev",
-        author_association="OWNER",
-        commit_id="ghi789",
-        line=105,
-        language="c",
-        created_at="2020-01-03T00:00:00Z",
+def test_classify_project_type_returns_iterable():
+    """Testa que classify_project_type retorna um iterable."""
+    pr = PRRecord(
+        id=1,
+        html_url="https://github.com/test/repo/pull/1#discussion_r1",
+        repo="test/repo",
+        path="src/main.py",
+        body="This fixes a critical bug in the login button.",
+        diff_hunk="@@ -10,6 +10,10 @@",
+        author="test_user",
+        author_association="CONTRIBUTOR",
+        commit_id="abc123",
+        line=15,
+        language="python",
+        created_at="2024-01-01T00:00:00Z",
     )
+    result = classify_project_type([pr])
+    # Verifica se é iterable
+    assert hasattr(result, "__iter__")
 
 
 @pytest.fixture(autouse=True)
@@ -608,3 +420,161 @@ class TestClassifiersIntegration:
         result3 = classify_pr_nature(sample_pr)
 
         assert result1 == result2 == result3
+
+
+# ---------------------------------------------------------------------------
+# Tests: ISSUE-C - Closure Capture Fix
+# ---------------------------------------------------------------------------
+
+
+class TestClosureCaptureIssueC:
+    """Testes para validar fix de captura por referência (ISSUE-C)."""
+
+    @patch("services.classifiers.classify_project_type_batch")
+    def test_classify_project_type_closure_captures_by_value(
+        self, mock_llm, sample_pr, sample_pr_different_repo
+    ):
+        """Testa que closure não captura repo_records por referência."""
+        # Configure mock para retornar diferentes valores por chamada
+        mock_llm.side_effect = [
+            '{"project_type": "library"}',  # Primeira chamada (golang/go)
+            '{"project_type": "web_app"}',  # Segunda chamada (torvalds/linux)
+        ]
+
+        records = [sample_pr, sample_pr_different_repo]
+        results = list(classify_project_type(records))
+
+        # Deve retornar 2 resultados
+        assert len(results) == 2
+
+        # Cada PR deve ter classificação correta do seu repositório
+        golang_results = [r for r in results if r.repo == "golang/go"]
+        linux_results = [r for r in results if r.repo == "torvalds/linux"]
+
+        assert len(golang_results) == 1
+        assert len(linux_results) == 1
+
+        # Validar que cada recebeu sua classificação
+        assert golang_results[0].project_type == "library"
+        assert linux_results[0].project_type == "web_app"
+
+
+# ---------------------------------------------------------------------------
+# Tests: ISSUE-A - Real classify_pr_nature()
+# ---------------------------------------------------------------------------
+
+
+class TestClassifyPRNatureRealLLM:
+    """Testes para validar implementação real de classify_pr_nature (ISSUE-A)."""
+
+    @patch("services.classifiers.classify_pr_nature_single")
+    def test_classify_pr_nature_calls_llm_on_cache_miss(self, mock_llm, sample_pr):
+        """Testa que classify_pr_nature chama LLM em cache miss."""
+        mock_llm.return_value = '{"pr_nature": "feature"}'
+
+        result = classify_pr_nature(sample_pr)
+
+        # Deve chamar LLM uma vez
+        assert mock_llm.call_count == 1
+        # Deve normalizar e retornar "feature"
+        assert result == "feature"
+
+    @patch("services.classifiers.classify_pr_nature_single")
+    def test_classify_pr_nature_returns_normalized_value(self, mock_llm, sample_pr):
+        """Testa que normalize_label é aplicado ao resultado."""
+        # Mock retorna valor que precisa normalização
+        mock_llm.return_value = '{"pr_nature": "bug-fix"}'
+
+        result = classify_pr_nature(sample_pr)
+
+        # Deve normalizar "bug-fix" → "bug_fix"
+        assert result == "bug_fix"
+
+    @patch("services.classifiers.classify_pr_nature_single")
+    def test_classify_pr_nature_returns_other_on_invalid(self, mock_llm, sample_pr):
+        """Testa que retorna 'other' para labels inválidas."""
+        mock_llm.return_value = '{"pr_nature": "invalid_nature"}'
+
+        result = classify_pr_nature(sample_pr)
+
+        # Deve normalizar para "other"
+        assert result == "other"
+
+    @patch("services.classifiers.classify_pr_nature_single")
+    def test_classify_pr_nature_uses_two_level_cache(self, mock_llm, sample_pr):
+        """Testa que usa cache de dois níveis (memória + disco)."""
+        mock_llm.return_value = '{"pr_nature": "feature"}'
+
+        # Primeira chamada: cache miss, chama LLM
+        result1 = classify_pr_nature(sample_pr)
+        call_count_1 = mock_llm.call_count
+
+        # Segunda chamada: cache hit, não chama LLM
+        result2 = classify_pr_nature(sample_pr)
+        call_count_2 = mock_llm.call_count
+
+        assert result1 == "feature"
+        assert result2 == "feature"
+        # Mock não deve ser chamado novamente (cache hit)
+        assert call_count_1 == 1
+        assert call_count_2 == 1
+
+
+# ---------------------------------------------------------------------------
+# Tests: ISSUE-B - Real classify_clarity()
+# ---------------------------------------------------------------------------
+
+
+class TestClassifyClarityRealLLM:
+    """Testes para validar implementação real de classify_clarity (ISSUE-B)."""
+
+    @patch("services.classifiers.classify_clarity_single")
+    def test_classify_clarity_calls_llm_on_cache_miss(self, mock_llm, sample_pr):
+        """Testa que classify_clarity chama LLM em cache miss."""
+        mock_llm.return_value = '{"clarity_level": "good"}'
+
+        result = classify_clarity(sample_pr)
+
+        # Deve chamar LLM uma vez
+        assert mock_llm.call_count == 1
+        # Deve normalizar e retornar "good"
+        assert result == "good"
+
+    @patch("services.classifiers.classify_clarity_single")
+    def test_classify_clarity_returns_normalized_value(self, mock_llm, sample_pr):
+        """Testa que normalize_label é aplicado ao resultado."""
+        mock_llm.return_value = '{"clarity_level": "excellent"}'
+
+        result = classify_clarity(sample_pr)
+
+        # Deve manter "excellent" (já é válido)
+        assert result == "excellent"
+
+    @patch("services.classifiers.classify_clarity_single")
+    def test_classify_clarity_returns_other_on_invalid(self, mock_llm, sample_pr):
+        """Testa que retorna 'other' para labels inválidas."""
+        mock_llm.return_value = '{"clarity_level": "awesome"}'
+
+        result = classify_clarity(sample_pr)
+
+        # Deve normalizar para "other"
+        assert result == "other"
+
+    @patch("services.classifiers.classify_clarity_single")
+    def test_classify_clarity_uses_two_level_cache(self, mock_llm, sample_pr):
+        """Testa que usa cache de dois níveis (memória + disco)."""
+        mock_llm.return_value = '{"clarity_level": "good"}'
+
+        # Primeira chamada: cache miss, chama LLM
+        result1 = classify_clarity(sample_pr)
+        call_count_1 = mock_llm.call_count
+
+        # Segunda chamada: cache hit, não chama LLM
+        result2 = classify_clarity(sample_pr)
+        call_count_2 = mock_llm.call_count
+
+        assert result1 == "good"
+        assert result2 == "good"
+        # Mock não deve ser chamado novamente (cache hit)
+        assert call_count_1 == 1
+        assert call_count_2 == 1
