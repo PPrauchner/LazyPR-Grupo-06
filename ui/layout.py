@@ -51,7 +51,7 @@ def render_dataset_card(
     style="
         width: 100%;
         box-sizing: border-box;
-        padding: 1rem;
+        padding: 0.8rem;
         border-radius: 16px;
         border: 1px solid {theme['border']};
         background-color: {theme['card']};

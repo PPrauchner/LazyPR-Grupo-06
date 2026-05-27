@@ -75,37 +75,37 @@ def render_home(
     with kpi_col1:
 
         metric_card(
-            title="Total PRs",
+            label="Total PRs",
             value=str(len(records)),
             icon="📦",
-            trend="+14%",
+            delta="+14%",
         )
 
     with kpi_col2:
 
         metric_card(
-            title="Linguagens",
+            label="Linguagens",
             value="18",
             icon="💻",
-            trend="+3",
+            delta="+3",
         )
 
     with kpi_col3:
 
         metric_card(
-            title="Projetos",
+            label="Projetos",
             value="42",
             icon="🧩",
-            trend="+7%",
+            delta="+7%",
         )
 
     with kpi_col4:
 
         metric_card(
-            title="Clareza Média",
+            label="Clareza Média",
             value="8.7",
             icon="✨",
-            trend="+0.6",
+            delta="+0.6",
         )
 
     st.divider()

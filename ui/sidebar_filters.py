@@ -15,6 +15,7 @@ Não deve:
 """
 
 import streamlit as st
+
 from ui.layout import (
     render_section_title,
     render_dataset_card,
@@ -159,25 +160,28 @@ def render_sidebar() -> dict:
 
     with st.sidebar:
 
-        if "dark_mode" not in st.session_state:
+        if "theme_mode" not in st.session_state:
 
-            st.session_state["dark_mode"] = True
+            st.session_state["theme_mode"] = "dark"
 
-        theme_toggle = st.toggle(
+        theme_is_dark = st.session_state["theme_mode"] == "dark"
+
+        toggle_value = st.toggle(
             "🌙 Tema Escuro",
-            key="dark_mode",
+            value=theme_is_dark,
         )
 
-        st.caption("Alternar aparência visual do dashboard.")
+        st.session_state["theme_mode"] = "dark" if toggle_value else "light"
 
-        st.session_state["theme_mode"] = "dark" if theme_toggle else "light"
+        st.caption("Alternar aparência visual do dashboard.")
 
         st.title("🚀 LazyPR")
 
         st.markdown("""
-          Análise semântica de Pull Requests
-          com Programação Funcional e LLMs.
-          """)
+            Plataforma analítica para análise
+            semântica de Pull Requests
+            utilizando LLMs e Programação Funcional.
+            """)
 
         st.divider()
 
@@ -189,27 +193,29 @@ def render_sidebar() -> dict:
             label_visibility="collapsed",
         )
 
+        st.divider()
+
         render_section_title("FILTROS GLOBAIS")
 
-        selected_languages = st.multiselect(
+        st.multiselect(
             "Linguagens",
             LANGUAGES,
             key="selected_languages",
         )
 
-        selected_project_types = st.multiselect(
+        st.multiselect(
             "Tipos de Projeto",
             PROJECT_TYPES,
             key="selected_project_types",
         )
 
-        selected_natures = st.multiselect(
+        st.multiselect(
             "Natureza da Contribuição",
             PR_NATURES,
             key="selected_natures",
         )
 
-        selected_clarity = st.multiselect(
+        st.multiselect(
             "Nível de Clareza",
             CLARITY_LEVELS,
             key="selected_clarity",
@@ -235,11 +241,9 @@ def render_sidebar() -> dict:
 
         st.divider()
 
-        st.caption("Projeto desenvolvido com " "Programação Funcional.")
-
         dataset_name = st.session_state.get(
             "dataset_name",
-            "Nenhum dataset",
+            "Nenhum dataset carregado",
         )
 
         analysis_results = st.session_state.get(
@@ -251,6 +255,10 @@ def render_sidebar() -> dict:
             dataset_name,
             len(tuple(analysis_results)),
         )
+
+        st.divider()
+
+        st.caption("LazyPR • Programação Funcional • 2026")
 
     return {
         "page": selected_page,

@@ -1,28 +1,12 @@
 .stApp {
-  background-color: #0b1120;
-  color: #f3f4f6;
-}
-
-section[data-testid="stSidebar"] {
-  background-color: #111827;
-  border-right: 1px solid #1f2937;
-  box-shadow: 4px 0 25px rgba(0, 0, 0, 0.25);
-}
-
-div[data-testid="metric-container"] {
-  background-color: #121a2b;
-  border: 1px solid #1f2937;
-  border-radius: 16px;
-  padding: 1rem;
-  box-shadow: 0 0 20px rgba(124, 58, 237, 0.1);
-}
-
-.block-container {
-  padding-top: 2rem;
+  background-color: #020817;
+  color: #f8fafc;
 }
 
 [data-testid="stAppViewContainer"] {
-  background-color: #0b1120;
+  background:
+    radial-gradient(circle at top, rgba(124, 58, 237, 0.1), transparent 35%),
+    #020817;
 }
 
 [data-testid="stHeader"] {
@@ -33,33 +17,119 @@ div[data-testid="metric-container"] {
   right: 2rem;
 }
 
+section[data-testid="stSidebar"] {
+  background-color: #0f172a;
+  border-right: 1px solid #334155;
+  box-shadow: 4px 0 30px rgba(0, 0, 0, 0.35);
+}
+
+label,
+span,
+p,
+div,
+small {
+  color: #f8fafc;
+}
+
+.block-container {
+  padding-top: 2rem;
+}
+
+div[data-testid="metric-container"] {
+  background: linear-gradient(135deg, #111827, rgba(124, 58, 237, 0.06));
+
+  border: 1px solid #1f2937;
+  border-radius: 18px;
+
+  padding: 1rem;
+
+  box-shadow: 0 0 18px rgba(124, 58, 237, 0.06);
+
+  overflow: hidden;
+}
 
 div[role="radiogroup"] label {
   border-radius: 12px;
-  padding: 0.45rem 0.75rem;
-  margin-bottom: 0.35rem;
-  transition: 0.2s ease;
-}
 
+  padding: 0.55rem 0.8rem;
+
+  margin-bottom: 0.4rem;
+
+  transition: all 0.2s ease;
+
+  border: 1px solid transparent;
+}
 
 div[role="radiogroup"] label:hover {
-  background-color: rgba(255, 255, 255, 0.1);
-}
+  background-color: rgba(255, 255, 255, 0.06);
 
+  border: 1px solid rgba(124, 58, 237, 0.2);
+}
 
 div[role="radiogroup"] label[data-baseweb="radio"] {
-  background-color: rgba(124, 58, 237, 0.28);
-  border: 1px solid rgba(124, 58, 237, 0.35);
-}
+  background: linear-gradient(
+    135deg,
+    rgba(124, 58, 237, 0.28),
+    rgba(124, 58, 237, 0.14)
+  );
 
-.stDataFrame {
-  border-radius: 12px;
-  overflow: hidden;
+  border: 1px solid rgba(124, 58, 237, 0.35);
+
+  box-shadow: 0 0 12px rgba(124, 58, 237, 0.12);
 }
 
 .stTextInput input,
 .stSelectbox div,
 .stMultiSelect div,
-.stDateInput input {
-  border-radius: 10px;
+.stDateInput input,
+.stNumberInput input,
+textarea {
+  background-color: #111827 !important;
+
+  color: #f8fafc !important;
+
+  border-radius: 10px !important;
+
+  border: 1px solid #334155 !important;
+}
+
+.stDataFrame {
+  border-radius: 14px;
+
+  overflow: hidden;
+
+  border: 1px solid #1f2937;
+}
+
+.stButton button,
+.stDownloadButton button {
+  border-radius: 12px;
+
+  border: 1px solid #334155;
+
+  background-color: #111827;
+
+  color: #f8fafc;
+
+  transition: 0.2s ease;
+}
+
+.stButton button:hover,
+.stDownloadButton button:hover {
+  border: 1px solid rgba(124, 58, 237, 0.4);
+
+  box-shadow: 0 0 12px rgba(124, 58, 237, 0.12);
+}
+
+::-webkit-scrollbar {
+  width: 10px;
+}
+
+::-webkit-scrollbar-track {
+  background: #020817;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #334155;
+  border-radius: 999px;
 }
