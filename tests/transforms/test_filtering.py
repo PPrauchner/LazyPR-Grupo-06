@@ -22,21 +22,23 @@ Não deve:
 from typing import NamedTuple
 
 from core.transforms.filtering import (
+    by_language,
     by_project_type,
     by_pr_nature,
     by_clarity_level,
-    by_language,
     compose_predicates,
     apply_filters,
+    is_in_date_range,
+    is_language,
+    has_project_type,
+    has_pr_nature,
+    has_clarity_level,
+    build_filter
 )
 
 
-# Mock imutável simulando o PRRecord/AnalysisResult gerado pelo pipeline
 class MockResult(NamedTuple):
-    """
-    Mock imutável simulando AnalysisResult.
-    """
-
+    """Mock imutável simulando AnalysisResult."""
     language: str = ""
     project_type: str = ""
     pr_nature: str = ""
@@ -51,7 +53,7 @@ def test_is_language():
     assert predicate(MockResult(language="Python")) is True
     assert predicate(MockResult(language="python")) is True
     assert predicate(MockResult(language="Java")) is False
-    assert predicate(MockResult()) is False  # Comportamento seguro com atributo vazio
+
 
 
 def test_has_project_type():
@@ -88,21 +90,98 @@ def test_is_in_date_range():
     assert predicate(MockResult(created_at="2026-01-01T00:00:00Z")) is False
 
 
+# --- Testes das funções Base do PR ---
+
+def test_by_language_exact_match():
+    predicate = by_language(("Python",))
+    assert predicate(MockResult(language="Python")) is True
+    assert predicate(MockResult(language="python")) is True
+
+
+def test_by_language_no_match():
+    predicate = by_language(("Python",))
+    assert predicate(MockResult(language="Java")) is False
+
+
+def test_by_language_multiple_options():
+    predicate = by_language(("Python", "JavaScript", "Go"))
+    assert predicate(MockResult(language="javascript")) is True
+    assert predicate(MockResult(language="Java")) is False
+
+
+def test_by_project_type_multiple():
+    predicate = by_project_type(("library", "framework", "cli"))
+    assert predicate(MockResult(project_type="library")) is True
+    assert predicate(MockResult(project_type="web_app")) is False
+
+
+def test_by_pr_nature_multiple():
+    predicate = by_pr_nature(("bug_fix", "feature", "refactoring"))
+    assert predicate(MockResult(pr_nature="bug_fix")) is True
+    assert predicate(MockResult(pr_nature="documentation")) is False
+
+
+def test_by_clarity_level_multiple():
+    predicate = by_clarity_level(("excellent", "good"))
+    assert predicate(MockResult(clarity_level="good")) is True
+    assert predicate(MockResult(clarity_level="basic")) is False
+
+
+# --- Testes de Composição Funcional (compose_predicates / build_filter) ---
+
+def test_compose_predicates_empty():
+    predicate = compose_predicates([])
+    assert predicate(MockResult()) is True
+
+
 def test_build_filter_empty():
-    """Se nenhum filtro for passado, deve aprovar tudo."""
     predicate = build_filter()
     assert predicate(MockResult()) is True
 
 
 def test_build_filter_composition():
-    """Valida a conjunção lógica (AND) de múltiplos filtros puros."""
     predicate = build_filter(is_language("Python"), has_pr_nature("bug_fix"))
-
-    # Passa em ambos
+    
     assert predicate(MockResult(language="python", pr_nature="bug_fix")) is True
-
-    # Falha em um (Natureza diferente)
     assert predicate(MockResult(language="Python", pr_nature="feature")) is False
-
-    # Falha no outro (Linguagem diferente)
     assert predicate(MockResult(language="Java", pr_nature="bug_fix")) is False
+
+
+def test_compose_predicates_generator_input():
+    def predicate_generator():
+        yield by_language(("Python",))
+        yield by_pr_nature(("feature",))
+
+    composed = compose_predicates(predicate_generator())
+    assert composed(MockResult(language="Python", pr_nature="feature")) is True
+    assert composed(MockResult(language="Java", pr_nature="feature")) is False
+
+
+# --- Testes de Pipeline (apply_filters) ---
+
+def test_apply_filters_lazy_evaluation():
+    predicates = [by_language(("Python",))]
+    records = [MockResult(language="Python"), MockResult(language="Java")]
+
+    result = apply_filters(predicates, records)
+    assert isinstance(result, filter)
+
+
+def test_apply_filters_filters_correctly():
+    predicates = [by_language(("Python",))]
+    records = [
+        MockResult(language="Python"),
+        MockResult(language="Java"),
+        MockResult(language="Python"),
+    ]
+
+    result = list(apply_filters(predicates, records))
+    assert len(result) == 2
+    assert all(r.language == "Python" for r in result)
+
+
+def test_apply_filters_empty_predicates():
+    predicates = []
+    records = [MockResult(language="Python"), MockResult(language="Java")]
+    result = list(apply_filters(predicates, records))
+    assert len(result) == 2
