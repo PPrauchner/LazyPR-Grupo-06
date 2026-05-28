@@ -18,8 +18,14 @@
 }
 
 section[data-testid="stSidebar"] {
-  background-color: #0f172a;
+  background: linear-gradient(
+    180deg,
+    rgba(15, 23, 42, 0.96),
+    rgba(2, 8, 23, 0.98)
+  );
+
   border-right: 1px solid #334155;
+
   box-shadow: 4px 0 30px rgba(0, 0, 0, 0.35);
 }
 
@@ -27,7 +33,13 @@ label,
 span,
 p,
 div,
-small {
+small,
+h1,
+h2,
+h3,
+h4,
+h5,
+h6 {
   color: #f8fafc;
 }
 
@@ -39,6 +51,7 @@ div[data-testid="metric-container"] {
   background: linear-gradient(135deg, #111827, rgba(124, 58, 237, 0.06));
 
   border: 1px solid #1f2937;
+
   border-radius: 18px;
 
   padding: 1rem;
@@ -79,18 +92,133 @@ div[role="radiogroup"] label[data-baseweb="radio"] {
 }
 
 .stTextInput input,
-.stSelectbox div,
-.stMultiSelect div,
-.stDateInput input,
 .stNumberInput input,
 textarea {
   background-color: #111827 !important;
 
   color: #f8fafc !important;
 
-  border-radius: 10px !important;
+  border-radius: 12px !important;
 
   border: 1px solid #334155 !important;
+}
+
+.stSelectbox div,
+.stMultiSelect div {
+  background-color: #111827 !important;
+
+  color: #f8fafc !important;
+
+  border-radius: 12px !important;
+
+  border: 1px solid #334155 !important;
+}
+
+.stDateInput {
+  margin-top: 0.3rem;
+}
+
+.stDateInput input {
+  background-color: #111827 !important;
+
+  border-radius: 12px !important;
+
+  border: 1px solid #334155 !important;
+
+  color: #f8fafc !important;
+}
+[data-baseweb="calendar"] {
+  background-color: #111827 !important;
+
+  border: 1px solid #334155 !important;
+
+  border-radius: 16px !important;
+
+  color: #f8fafc !important;
+
+  box-shadow: 0 0 25px rgba(0, 0, 0, 0.35) !important;
+  /* Cabeçalho do calendário */
+
+  [data-baseweb="calendar-header"] {
+    background-color: #111827 !important;
+
+    color: #f8fafc !important;
+  }
+
+  /* Texto mês/ano */
+
+  [data-baseweb="calendar"] select,
+  [data-baseweb="calendar"] button,
+  [data-baseweb="calendar"] span {
+    color: #f8fafc !important;
+  }
+
+  /* Dias fora do mês */
+
+  [data-baseweb="calendar"] td[aria-disabled="true"] {
+    background-color: #111827 !important;
+
+    color: #475569 !important;
+  }
+
+  /* Células vazias */
+
+  [data-baseweb="calendar"] td {
+    background-color: #1e293b !important;
+  }
+}
+[data-baseweb="input"] {
+  background-color: #111827 !important;
+
+  border: 1px solid #334155 !important;
+
+  border-radius: 12px !important;
+}
+
+/* Campo interno */
+
+[data-baseweb="input"] input {
+  background-color: #111827 !important;
+
+  color: #f8fafc !important;
+}
+
+/* Área
+
+/* Header calendário */
+
+[data-baseweb="calendar"] * {
+  color: #f8fafc !important;
+}
+
+/* Dias */
+
+[data-baseweb="calendar"] td {
+  border-radius: 10px !important;
+}
+
+/* Hover dias */
+
+[data-baseweb="calendar"] td:hover {
+  background-color: rgba(124, 58, 237, 0.18) !important;
+}
+
+/* Dia selecionado */
+
+[data-baseweb="calendar"] [aria-selected="true"] {
+  background-color: #7c3aed !important;
+
+  color: white !important;
+
+  border-radius: 999px !important;
+}
+
+/* Espaçamento filtros */
+
+.stMultiSelect,
+.stSelectbox,
+.stDateInput {
+  margin-bottom: 0.55rem;
 }
 
 .stDataFrame {
@@ -105,13 +233,13 @@ textarea {
 .stDownloadButton button {
   border-radius: 12px;
 
-  border: 1px solid #334155;
+  border: 1px solid rgba(255, 255, 255, 0.06);
 
   background-color: #111827;
 
   color: #f8fafc;
 
-  transition: 0.2s ease;
+  transition: all 0.2s ease;
 }
 
 .stButton button:hover,
@@ -119,6 +247,8 @@ textarea {
   border: 1px solid rgba(124, 58, 237, 0.4);
 
   box-shadow: 0 0 12px rgba(124, 58, 237, 0.12);
+
+  transform: translateY(-1px);
 }
 
 ::-webkit-scrollbar {
@@ -131,5 +261,153 @@ textarea {
 
 ::-webkit-scrollbar-thumb {
   background: #334155;
+
   border-radius: 999px;
+}
+
+hr {
+  border-color: rgba(148, 163, 184, 0.15);
+}
+
+.streamlit-expanderHeader {
+  background-color: #111827;
+
+  border-radius: 12px;
+
+  border: 1px solid #334155;
+}
+
+.js-plotly-plot .plotly .hoverlayer {
+  font-family: inherit;
+}
+
+/* Upload container */
+
+[data-testid="stFileUploader"] {
+  background: linear-gradient(
+    135deg,
+    rgba(15, 23, 42, 0.95),
+    rgba(30, 41, 59, 0.92)
+  ) !important;
+
+  border: 1px dashed rgba(124, 58, 237, 0.35) !important;
+
+  border-radius: 18px !important;
+
+  padding: 1rem !important;
+
+  box-shadow: 0 0 18px rgba(124, 58, 237, 0.06);
+
+  transition: 0.2s ease;
+}
+
+/* Hover */
+
+[data-testid="stFileUploader"]:hover {
+  border: 1px dashed rgba(124, 58, 237, 0.55) !important;
+
+  box-shadow: 0 0 24px rgba(124, 58, 237, 0.12);
+}
+
+/* Área interna */
+
+[data-testid="stFileUploaderDropzone"] {
+  background: transparent !important;
+
+  border: none !important;
+}
+
+/* Texto */
+
+[data-testid="stFileUploader"] * {
+  color: #f8fafc !important;
+}
+
+/* Botão Browse files */
+
+[data-testid="stBaseButton-secondary"] {
+  background: linear-gradient(
+    135deg,
+    rgba(124, 58, 237, 0.2),
+    rgba(124, 58, 237, 0.12)
+  ) !important;
+
+  border: 1px solid rgba(124, 58, 237, 0.35) !important;
+
+  color: #f8fafc !important;
+
+  border-radius: 12px !important;
+
+  font-weight: 600 !important;
+
+  transition: 0.2s ease !important;
+}
+
+/* Hover botão */
+
+[data-testid="stBaseButton-secondary"]:hover {
+  border: 1px solid rgba(124, 58, 237, 0.55) !important;
+
+  box-shadow: 0 0 16px rgba(124, 58, 237, 0.14);
+}
+
+/* Toast */
+
+[data-testid="stToast"] {
+  background: linear-gradient(135deg, #111827, #1e293b) !important;
+
+  border: 1px solid rgba(124, 58, 237, 0.35);
+
+  color: #f8fafc !important;
+
+  border-radius: 14px !important;
+
+  box-shadow: 0 0 24px rgba(124, 58, 237, 0.14);
+}
+
+/* Texto do toast */
+
+[data-testid="stToast"] * {
+  color: #f8fafc !important;
+}
+
+/* Toast */
+
+[data-testid="stToast"] {
+  background: linear-gradient(
+    135deg,
+    rgba(16, 185, 129, 0.22),
+    rgba(5, 150, 105, 0.18),
+    rgba(6, 78, 59, 0.95)
+  ) !important;
+
+  border: 1px solid rgba(52, 211, 153, 0.38) !important;
+
+  color: #ecfdf5 !important;
+
+  border-radius: 14px !important;
+
+  backdrop-filter: blur(12px);
+
+  box-shadow:
+    0 0 18px rgba(16, 185, 129, 0.18),
+    0 0 34px rgba(34, 197, 94, 0.12);
+
+  transition: 0.2s ease;
+}
+
+/* Texto do toast */
+
+[data-testid="stToast"] * {
+  color: #ecfdf5 !important;
+
+  font-weight: 600;
+}
+
+/* Hover */
+
+[data-testid="stToast"]:hover {
+  box-shadow:
+    0 0 24px rgba(16, 185, 129, 0.24),
+    0 0 42px rgba(34, 197, 94, 0.16);
 }
