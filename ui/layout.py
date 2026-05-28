@@ -36,61 +36,68 @@ def render_section_title(
 
 
 def render_dataset_card(
-    filename: str,
+    dataset_name: str,
     total_records: int,
 ) -> None:
     """
-    Renderiza card visual do dataset carregado.
+    Renderiza card compacto do dataset carregado.
     """
 
-    theme = get_theme()
+    card_html = f"""
+    <div
+        style="
+            padding: 1rem;
+            border-radius: 16px;
+            border: 1px solid rgba(34,197,94,0.20);
+            background: linear-gradient(
+                135deg,
+                rgba(34,197,94,0.08),
+                rgba(15,23,42,0.45)
+            );
+            margin-top: 0.8rem;
+            box-shadow: 0 0 16px rgba(34,197,94,0.08);
+        "
+    >
+
+    <div
+      style="
+                display: flex;
+                align-items: center;
+                gap: 0.45rem;
+                color: #4ade80;
+                font-size: 0.82rem;
+                font-weight: 700;
+                margin-bottom: 0.6rem;
+        "
+        >
+            ● Dataset carregado
+    </div>
+
+    <div
+     style="
+                font-size: 0.85rem;
+                font-weight: 600;
+                color: #f8fafc;
+                overflow: hidden;
+                text-overflow: ellipsis;
+                white-space: nowrap;
+    "
+        >
+            {dataset_name}
+    </div>
+
+    <div
+     style="
+                margin-top: 0.45rem;
+                font-size: 0.76rem;
+                color: #cbd5e1;
+        "
+        >
+            {total_records:,} registros
+    </div>
+    """
 
     st.markdown(
-        f"""
-<div
-    style="
-        width: 100%;
-        box-sizing: border-box;
-        padding: 0.8rem;
-        border-radius: 16px;
-        border: 1px solid {theme['border']};
-        background-color: {theme['card']};
-        margin-top: 1rem;
-        margin-bottom: 1rem;
-    "
->
-    <div
-        style="
-            font-size: 0.85rem;
-            opacity: 0.7;
-            color: {theme['muted_text']};
-        "
-    >
-        DATASET CARREGADO
-    </div>
-
-    <div
-        style="
-            margin-top: 0.5rem;
-            font-weight: 600;
-            font-size: 1rem;
-            theme['sidebar_text'];
-        "
-    >
-        📂 {filename}
-    </div>
-
-    <div
-        style="
-            margin-top: 0.5rem;
-            opacity: 0.8;
-            font-size: 0.9rem;
-            color: {theme['muted_text']};
-        "
-    >
-        📊 {total_records} registros analisados
-    </div>
-</div>
-        """,
+        card_html,
         unsafe_allow_html=True,
     )

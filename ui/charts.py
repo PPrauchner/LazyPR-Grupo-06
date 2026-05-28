@@ -62,6 +62,7 @@ BIN_CONFIG = {
     },
 }
 
+
 def apply_default_layout(
     figure: go.Figure,
     title: str,
@@ -87,10 +88,10 @@ def apply_default_layout(
             "color": theme["text"],
         },
         margin=dict(
-            l=20,
-            r=20,
-            t=60,
-            b=20,
+            l=0,
+            r=0,
+            t=40,
+            b=0,
         ),
         hoverlabel=dict(
             bgcolor=theme["card"],

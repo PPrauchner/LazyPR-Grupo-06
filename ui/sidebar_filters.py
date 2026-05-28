@@ -15,6 +15,7 @@ Não deve:
 """
 
 import streamlit as st
+from datetime import date
 
 from ui.layout import (
     render_section_title,
@@ -178,9 +179,7 @@ def render_sidebar() -> dict:
         st.title("🚀 LazyPR")
 
         st.markdown("""
-            Plataforma analítica para análise
-            semântica de Pull Requests
-            utilizando LLMs e Programação Funcional.
+            Plataforma para análise semântica de Pull Requests com LLMs.
             """)
 
         st.divider()
@@ -228,18 +227,54 @@ def render_sidebar() -> dict:
 
         if use_date_filter:
 
-            dates = st.date_input(
-                "Intervalo de criação",
-                key="date_range",
+            st.markdown("##### Período")
+
+            start_date = st.date_input(
+                "Data inicial",
+                value=date(2020, 1, 1),
+                key="start_date_input",
             )
 
-            if len(dates) == 2:
+            end_date = st.date_input(
+                "Data final",
+                value=date.today(),
+                key="end_date_input",
+            )
 
-                st.session_state["start_date"] = dates[0].strftime("%Y-%m-%d")
+            st.session_state["start_date"] = (
+                start_date.strftime("%Y-%m-%d")
+            )
 
-                st.session_state["end_date"] = dates[1].strftime("%Y-%m-%d")
+            st.session_state["end_date"] = (
+                end_date.strftime("%Y-%m-%d")
+            )
 
         st.divider()
+
+        if st.button(
+            "↻ Limpar filtros",
+            width="stretch",
+        ):
+
+            keys_to_clear = (
+                "selected_languages",
+                "selected_project_types",
+                "selected_natures",
+                "selected_clarity",
+                "use_date_filter",
+                "start_date",
+                "end_date",
+                "start_date_input",
+                "end_date_input",
+            )
+
+            for key in keys_to_clear:
+
+                if key in st.session_state:
+
+                    del st.session_state[key]
+
+            st.rerun()
 
         dataset_name = st.session_state.get(
             "dataset_name",
@@ -258,7 +293,9 @@ def render_sidebar() -> dict:
 
         st.divider()
 
-        st.caption("LazyPR • Programação Funcional • 2026")
+        st.caption(
+            "LazyPR • 2026"
+        )
 
     return {
         "page": selected_page,

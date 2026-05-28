@@ -17,9 +17,6 @@ Não deve:
 """
 
 import streamlit as st
-from ui.theme import (
-    apply_theme,
-)
 
 from views.home import (
     render_home,
@@ -51,9 +48,12 @@ st.set_page_config(
     layout="wide",
 )
 
-if "theme_mode" not in st.session_state:
+from ui.theme import (
+    apply_theme,
+    initialize_theme,
+)
 
-    st.session_state["theme_mode"] = "dark"
+initialize_theme()
 
 apply_theme()
 
