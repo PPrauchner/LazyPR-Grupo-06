@@ -24,47 +24,152 @@ def render_home(
 
     st.markdown(
         f"""
-        <div
-            style="
-                padding: 3rem 2rem;
-                border-radius: 24px;
-                background: linear-gradient(
+    <div
+        style="
+            padding: 2rem 2rem;
+            border-radius: 24px;
+            background:
+            radial-gradient(
+            circle at top left,
+            rgba(124,58,237,0.18),
+            transparent 30%
+        ),
+                linear-gradient(
                     135deg,
-                    {theme['card']},
-                    rgba(124,58,237,0.12)
+                    #020817,
+                    #0f172a
                 );
-                border: 1px solid {theme['border']};
-                margin-bottom: 2rem;
-                box-shadow: 0 0 30px rgba(124,58,237,0.10);
-            "
-        >
+            border: 1px solid {theme['border']};
+            box-shadow: 0 0 30px rgba(124,58,237,0.08);
+            margin-bottom: 1.5rem;
+        "
+    >
 
-            <div
-                style="
-                    font-size: 3rem;
-                    font-weight: 800;
-                    color: {theme['text']};
-                "
-            >
-                🚀 LazyPR
-            </div>
+    <div
+        style="
+           display: flex;
+           justify-content: space-between;
+           align-items: center;
+           gap: 2rem;
+           flex-wrap: wrap;
+        "
+    >
 
-            <div
-                style="
-                    margin-top: 1rem;
-                    font-size: 1.1rem;
-                    line-height: 1.8;
-                    color: {theme['muted_text']};
-                    max-width: 850px;
-                "
-            >
-                Plataforma analítica para análise semântica
-                de Pull Requests utilizando Programação Funcional,
-                visualização interativa de dados e modelos de linguagem.
-            </div>
+      <!-- TEXTO -->
 
-        </div>
-        """,
+    <div
+        style="
+        flex: 1;
+        min-width: 320px;
+        "
+    >
+
+    <div
+        style="
+           font-size: 2.3rem;
+           font-weight: 800;
+           color: {theme['text']};
+        "
+    >
+        Bem-vindo ao
+        <span style="color:#8b5cf6;">
+        LazyPR
+        </span>
+    </div>
+
+    <div
+        style="
+            margin-top: 1rem;
+            font-size: 1rem;
+            line-height: 1.8;
+            color: {theme['muted_text']};
+            max-width: 650px;
+        "
+    >
+                Pipeline funcional para análise semântica
+                de Pull Requests do GitHub.
+                Dados processados com LLMs,
+                cache persistente e agregações
+                multidimensionais.
+    </div>
+
+    </div>
+
+    <!-- PIPELINE -->
+
+    <div
+        style="
+            display: flex;
+            align-items: center;
+            gap: 1.2rem;
+            flex-wrap: wrap;
+        "
+    >
+
+    <div style="text-align:center;">
+    <div style="font-size:2.4rem;">📥</div>
+    <div style="font-weight:700;color:white;">
+            Ingestão
+    </div>
+    <div style="font-size:0.8rem;color:#94a3b8;">
+            CSV → Stream
+    </div>
+    </div>
+
+    <div style="font-size:2rem;color:#94a3b8;">→</div>
+
+    <div style="text-align:center;">
+    <div style="font-size:2.4rem;">🧹</div>
+    <div style="font-weight:700;color:white;">
+            Limpeza
+    </div>
+    <div style="font-size:0.8rem;color:#94a3b8;">
+            Remove ruídos
+    </div>
+    </div>
+
+    <div style="font-size:2rem;color:#94a3b8;">→</div>
+
+    <div style="text-align:center;">
+    <div style="font-size:2.4rem;">⚙️</div>
+    <div style="font-weight:700;color:white;">
+            Normalização
+    </div>
+    <div style="font-size:0.8rem;color:#94a3b8;">
+            Padrões e Labels
+    </div>
+    </div>
+
+    <div style="font-size:2rem;color:#94a3b8;">→</div>
+
+    <div style="text-align:center;">
+    <div style="font-size:2.4rem;">🤖</div>
+    <div style="font-weight:700;color:white;">
+            Classificação
+    </div>
+    <div style="font-size:0.8rem;color:#94a3b8;">
+            LLMs
+    </div>
+    </div>
+
+    <div style="font-size:2rem;color:#94a3b8;">→</div>
+
+    <div style="text-align:center;">
+    <div style="font-size:2.4rem;">📊</div>
+    <div style="font-weight:700;color:white;">
+            Agregação
+    </div>
+    <div style="font-size:0.8rem;color:#94a3b8;">
+            Métricas
+    </div>
+    </div>
+
+    </div>
+
+    </div>
+
+    </div>
+    """,
         unsafe_allow_html=True,
     )
 
@@ -143,25 +248,25 @@ def render_home(
                     "
                 >
 
-                    <div
-                        style="
-                            font-size: 2rem;
-                        "
-                    >
-                        {icon}
-                    </div>
+    <div
+       style="
+       font-size: 2rem;
+    "
+    >
+        {icon}
+    </div>
 
-                    <div
-                        style="
-                            margin-top: 0.7rem;
-                            font-weight: 700;
-                            color: {theme['text']};
-                        "
-                    >
-                        {title}
-                    </div>
+    <div
+        style="
+            margin-top: 0.7rem;
+            font-weight: 700;
+            color: {theme['text']};
+    "
+    >
+            {title}
+    </div>
 
-                </div>
+    </div>
                 """,
                 unsafe_allow_html=True,
             )

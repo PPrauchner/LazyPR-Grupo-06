@@ -54,52 +54,52 @@ def metric_card(
             "
         >
 
-            <div
-                style="
-                    display: flex;
-                    align-items: center;
-                    justify-content: space-between;
-                "
-            >
+<div
+    style="
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+    "
+>
 
-                <div
-                    style="
-                        color: {theme['muted_text']};
-                        font-size: 0.92rem;
-                        font-weight: 600;
-                    "
-                >
-                    {icon} {label}
-                </div>
+<div
+    style="
+       color: {theme['muted_text']};
+       font-size: 0.92rem;
+       font-weight: 600;
+   "
+>
+     {icon} {label}
+</div>
 
-            </div>
+</div>
 
-            <div
-                style="
-                    margin-top: 0.8rem;
-                    font-size: 2rem;
-                    font-weight: 800;
-                    color: {theme['text']};
-                "
-            >
-                {value}
-            </div>
+<div
+    style="
+       margin-top: 0.8rem;
+       font-size: 2rem;
+       font-weight: 800;
+       color: {theme['text']};
+    "
+>
+     {value}
+</div>
 
-            <div
-                style="
-                    margin-top: 0.35rem;
-                    color: {trend_color};
-                    font-size: 0.85rem;
-                    font-weight: 700;
-                "
-            >
-                {trend_icon} {delta}
-            </div>
+<div
+   style="
+        margin-top: 0.35rem;
+        color: {trend_color};
+        font-size: 0.85rem;
+        font-weight: 700;
+    "
+>
+     {trend_icon} {delta}
+</div>
 
-        </div>
-        """,
-        unsafe_allow_html=True,
-    )
+</div>
+""",
+    unsafe_allow_html=True,
+)
 
 
 def chart_container_start() -> None:
