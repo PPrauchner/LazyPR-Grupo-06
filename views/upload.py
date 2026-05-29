@@ -22,6 +22,10 @@ from core.validators.dataset_schema import (
     validate_dataset_columns,
 )
 
+from services.ingestion import (
+    ingest_dataset,
+)
+
 
 def _validate_schema(
     uploaded_file: UploadedFile,
@@ -56,8 +60,8 @@ def _validate_schema(
 
         st.info(
             "Modo compatível ativado: "
-            "algumas métricas avançadas "
-            "foram desabilitadas."
+            "Algumas métricas avançadas "
+            "Foram desabilitadas."
         )
 
     return True
@@ -78,6 +82,7 @@ def render_upload_page() -> None:
     uploaded_file = st.file_uploader(
         "Selecione o arquivo CSV",
         type=["csv"],
+        key="upload_dataset_csv",
     )
 
     if uploaded_file is None:
@@ -94,17 +99,37 @@ def render_upload_page() -> None:
 
         st.stop()
 
-    st.session_state["dataset_name"] = uploaded_file.name
-
-    if st.button(
+if st.button(
     "Iniciar Análise 🚀",
     width="stretch",
-    ):
-        
-     st.session_state["dataset_file"] = (
-        uploaded_file
-    )
+    key="btn_iniciar_analise",
+):
 
-     st.toast(
-        "Pipeline iniciado 🚀"
-    )
+    with st.spinner(
+        "Processando dataset..."
+    ):
+
+        try:
+
+            records = ingest_dataset(
+                uploaded_file,
+            )
+
+            st.session_state[
+                "analysis_results"
+            ] = records
+
+            st.session_state[
+                "dataset_name"
+            ] = uploaded_file.name
+
+            st.success(
+                f"Dataset processado com sucesso. "
+                f"{len(records)} registros carregados."
+            )
+
+        except Exception as exc:
+
+            st.error(
+                f"Erro durante o processamento: {exc}"
+            )
