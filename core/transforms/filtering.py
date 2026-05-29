@@ -165,9 +165,22 @@ def compose_predicates(predicates: Iterable[Predicate]) -> Predicate:
 
 
 def apply_filters(
-    predicates: Iterable[Predicate],
-    records: Iterable[AnalysisResult],
-) -> filter:
+    predicate,
+    records,
+):
+    return filter(
+        predicate,
+        records,
+    )
+
+    """
+    Aplica um predicado composto aos registros.
+    """
+
+    return filter(
+        predicate,
+        records,
+    )
     """
     Aplica um pipeline de filtros encadeados a um stream de registros utilizando avaliação preguiçosa (lazy evaluation).
 
