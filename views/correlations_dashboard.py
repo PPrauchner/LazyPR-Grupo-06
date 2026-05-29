@@ -66,10 +66,10 @@ def render_correlation_dashboard(
     st.markdown("""
         Relação entre:
 
-        - clareza
-        - linguagem
-        - tipo de projeto
-        - natureza da contribuição
+        - Clareza
+        - Linguagem
+        - Tipo de Projeto
+        - Natureza da Contribuição
         """)
 
     st.divider()

@@ -1,21 +1,12 @@
 """
 Dashboard principal para visualização do volume de contribuições.
 
-Esta página apresenta gráficos interativos construídos com
-Streamlit e Plotly para análise agregada dos pull requests.
-
 Responsabilidades:
     - Exibir volume de PRs por linguagem
     - Exibir volume por tipo de projeto
     - Exibir volume por natureza da contribuição
     - Organizar o dashboard em containers e colunas
     - Consumir exclusivamente dados previamente agregados
-    - Manter separação entre UI e lógica funcional
-
-Não deve:
-    - Realizar agregações diretamente
-    - Modificar o dataset
-    - Implementar regras de negócio
 """
 
 from functools import reduce
@@ -29,10 +20,18 @@ from core.aggregations.metrics import (
     word_distribution,
 )
 
-from core.aggregations.counters import (
-    count_by_language,
-    count_by_project_type,
-    count_by_pr_nature,
+from core.aggregations.grouping import (
+    aggregate_by_language,
+    aggregate_by_project_type,
+    aggregate_by_pr_nature,
+)
+
+from core.transforms.filtering import (
+    apply_filters,
+)
+
+from ui.sidebar_filters import (
+    get_active_filters,
 )
 
 from ui.charts import (
@@ -46,20 +45,12 @@ from ui.components import (
     chart_container_end,
 )
 
-from core.transforms.filtering import (
-    apply_filters,
-)
-
-from ui.sidebar_filters import (
-    get_active_filters,
-)
-
 
 def _count_total_records(
     records: Iterable[Any],
 ) -> int:
     """
-    Conta total de registros utilizando reduce().
+    Conta total de registros.
     """
 
     return reduce(
@@ -74,23 +65,21 @@ def render_header() -> None:
     Renderiza cabeçalho principal.
     """
 
-    st.title("Overview Pull Requests")
+    st.title("📊 Overview Pull Requests")
 
     st.markdown("""
-        Visualização agregada do volume de contribuições
-        classificadas pelo pipeline funcional do projeto.
+        Visualização agregada das contribuições
+        processadas pela pipeline funcional do LazyPR.
         """)
-
-    st.divider()
 
 
 def render_kpis(
     total_records: int,
-    language_data: dict,
-    project_type_data: dict,
+    language_data: Iterable[Any],
+    project_type_data: Iterable[Any],
 ) -> None:
     """
-    Renderiza KPI cards principais.
+    Renderiza KPI cards.
     """
 
     kpi_col1, kpi_col2, kpi_col3 = st.columns(3)
@@ -100,7 +89,7 @@ def render_kpis(
         metric_card(
             label="Total de PRs",
             value=f"{total_records:,}",
-            delta="+14%",
+            delta="",
             icon="📦",
             trend_direction="up",
         )
@@ -110,7 +99,7 @@ def render_kpis(
         metric_card(
             label="Linguagens",
             value=len(language_data),
-            delta="+6%",
+            delta="",
             icon="💻",
             trend_direction="up",
         )
@@ -120,21 +109,19 @@ def render_kpis(
         metric_card(
             label="Tipos de Projeto",
             value=len(project_type_data),
-            delta="+9%",
+            delta="",
             icon="🧩",
             trend_direction="up",
         )
 
-    st.divider()
-
 
 def render_main_charts(
-    language_data: dict,
-    project_type_data: dict,
-    pr_nature_data: dict,
+    language_data: Iterable[Any],
+    project_type_data: Iterable[Any],
+    pr_nature_data: Iterable[Any],
 ) -> None:
     """
-    Renderiza gráficos principais do dashboard.
+    Renderiza gráficos principais.
     """
 
     col1, col2 = st.columns(2)
@@ -169,8 +156,6 @@ def render_main_charts(
 
         chart_container_end()
 
-    st.write("")
-
     chart_container_start()
 
     st.plotly_chart(
@@ -189,19 +174,22 @@ def render_description_distributions(
     records: Iterable[Any],
 ) -> None:
     """
-    Renderiza distribuições estatísticas
-    de tamanho de descrição.
+    Renderiza métricas descritivas.
     """
 
-    stats = description_stats(records)
+    stats = description_stats(
+        records,
+    )
 
-    char_data = char_distribution(records)
+    char_data = char_distribution(
+        records,
+    )
 
-    word_data = word_distribution(records)
+    word_data = word_distribution(
+        records,
+    )
 
-    st.divider()
-
-    st.subheader("Distribuição de Tamanho de Descrição")
+    st.subheader("Distribuição de Descrições")
 
     metric_col1, metric_col2 = st.columns(2)
 
@@ -210,7 +198,7 @@ def render_description_distributions(
         metric_card(
             label="Média de Caracteres",
             value=round(stats["char"]["mean"]),
-            delta="+11%",
+            delta="",
             icon="✏️",
             trend_direction="up",
         )
@@ -220,7 +208,7 @@ def render_description_distributions(
         metric_card(
             label="Média de Palavras",
             value=round(stats["word"]["mean"]),
-            delta="+8%",
+            delta="",
             icon="📝",
             trend_direction="up",
         )
@@ -258,39 +246,49 @@ def render_description_distributions(
 
 def render_footer() -> None:
     """
-    Renderiza rodapé do dashboard.
+    Renderiza rodapé.
     """
 
-    st.divider()
-
-    st.caption("RP3 • Functional Dashboard • Streamlit")
+    st.caption("LazyPR Analytics Platform")
 
 
 def render_overview(
     records: Iterable[Any],
 ) -> None:
     """
-    Renderiza dashboard principal de overview.
+    Renderiza dashboard overview.
     """
 
     active_filter = get_active_filters()
 
     filtered_records = tuple(
-        apply_filters(
-            (active_filter,),
-            records,
-        )
+    apply_filters(
+        active_filter,
+        records,
+    )
+    )
+ 
+    language_data = aggregate_by_language(
+        filtered_records,
     )
 
-    language_data = count_by_language(filtered_records)
+    project_type_data = aggregate_by_project_type(
+        filtered_records,
+    )
 
-    project_type_data = count_by_project_type(filtered_records)
+    pr_nature_data = aggregate_by_pr_nature(
+        filtered_records,
+    )
 
-    pr_nature_data = count_by_pr_nature(filtered_records)
-
-    total_records = _count_total_records(filtered_records)
+    total_records = _count_total_records(
+        filtered_records,
+    )
 
     render_header()
+
+    total_records = len(
+    filtered_records,
+    )
 
     render_kpis(
         total_records,
