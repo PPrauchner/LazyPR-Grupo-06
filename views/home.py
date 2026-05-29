@@ -86,11 +86,8 @@ def render_home(
             max-width: 650px;
         "
     >
-                Pipeline funcional para análise semântica
-                de Pull Requests do GitHub.
-                Dados processados com LLMs,
-                cache persistente e agregações
-                multidimensionais.
+                Análise semântica de Pull Requests no GitHub com LLMs, cache persistente e agregações multidimensionais.
+
     </div>
 
     </div>
