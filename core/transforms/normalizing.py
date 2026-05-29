@@ -31,7 +31,7 @@ Relacionado a:
 from __future__ import annotations
 
 import functools
-from typing import Optional
+from typing import Optional, NamedTuple
 
 from core.models.analysis_result import AnalysisResult
 from core.models.pr_record import PRRecord
@@ -67,30 +67,12 @@ _LANGUAGE_VARIANTS = {
 # Funções Puras de Normalização
 # ---------------------------------------------------------------------------
 
-
 @functools.lru_cache(maxsize=256)
 def normalize_language(text: str | None) -> str | None:
     """Normaliza string de linguagem para forma canônica.
 
     Mapeia variações ("Python 3", "py3") para forma canônica ("python").
     Se não encontrar variação conhecida, retorna None.
-
-    Args:
-        text: Texto bruto de linguagem (ex: "Python 3", "javascript").
-
-    Returns:
-        Forma canônica em minúsculas (ex: "python"), ou None se não
-        reconhecida.
-
-    Examples:
-        >>> normalize_language("Python")
-        'python'
-        >>> normalize_language("JavaScript")
-        'javascript'
-        >>> normalize_language("UnknownLang")
-        None
-        >>> normalize_language(None)
-        None
     """
     if text is None or not isinstance(text, str):
         return None
@@ -98,7 +80,7 @@ def normalize_language(text: str | None) -> str | None:
     normalized_input = text.strip().lower()
 
     # Procura a linguagem canônica que contém esta variação
-    # Implementado com próximo() + filter() para pureza funcional
+    # Implementado com next() + iterador para pureza funcional
     matching_lang = next(
         (
             lang
@@ -112,42 +94,12 @@ def normalize_language(text: str | None) -> str | None:
 
 
 def calculate_char_count(body: str) -> int:
-    """Calcula número de caracteres no corpo do PR.
-
-    Args:
-        body: Texto do corpo do PR.
-
-    Returns:
-        Número de caracteres em body.
-
-    Examples:
-        >>> calculate_char_count("hello")
-        5
-        >>> calculate_char_count("")
-        0
-    """
+    """Calcula número de caracteres no corpo do PR."""
     return len(body) if body else 0
 
 
 def calculate_word_count(body: str) -> int:
-    """Calcula número de palavras no corpo do PR.
-
-    Implementado via split() — palavras são tokens separados por whitespace.
-
-    Args:
-        body: Texto do corpo do PR.
-
-    Returns:
-        Número de palavras (tokens whitespace-separated).
-
-    Examples:
-        >>> calculate_word_count("hello world test")
-        3
-        >>> calculate_word_count("single")
-        1
-        >>> calculate_word_count("")
-        0
-    """
+    """Calcula número de palavras no corpo do PR."""
     if not body:
         return 0
     return len(body.split())
@@ -160,25 +112,10 @@ def normalize_label(label: str, field: str) -> str:
     Implementado com map() + filter() sobre vocabulário válido:
     se label exato está no conjunto válido, retorna; caso contrário,
     retorna "other" como sentinela.
-
-    Args:
-        label: Label bruto retornado pelo LLM.
-        field: Campo sendo normalizado ("project_type", "pr_nature",
-               "clarity_level") para seleção do vocabulário correto.
-
-    Returns:
-        Label normalizado do vocabulário controlado, ou "other" se inválido.
-
-    Examples:
-        >>> normalize_label("library", "project_type")
-        'library'
-        >>> normalize_label("biblioteca", "project_type")  # inválido
-        'other'
-        >>> normalize_label("bug_fix", "pr_nature")
-        'bug_fix'
-        >>> normalize_label("BugFix", "pr_nature")  # variação inválida
-        'other'
     """
+    if not label:
+        return "other"
+        
     normalized_label = label.strip().lower().replace("-", "_")
 
     # Seleciona vocabulário correto baseado no campo
@@ -198,22 +135,7 @@ def normalize_pr_record(record: PRRecord) -> PRRecord:
     """Normaliza campos de um PRRecord para valores canônicos.
 
     Retorna novo PRRecord com language normalizada via normalize_language().
-    Função pura — nunca modifica record original, apenas retorna cópia
-    enriquecida.
-
-    Args:
-        record: PRRecord a normalizar.
-
-    Returns:
-        Novo PRRecord com language normalizada.
-
-    Examples:
-        >>> pr = PRRecord(id=1, ..., language="Python 3", ...)
-        >>> normalized = normalize_pr_record(pr)
-        >>> normalized.language
-        'python'
-        >>> pr.language  # original inalterado
-        'Python 3'
+    Função pura — nunca modifica record original, apenas retorna cópia enriquecida.
     """
     normalized_language = normalize_language(record.language)
     return record._replace(language=normalized_language)
@@ -224,20 +146,6 @@ def normalize_analysis_result(result: AnalysisResult) -> AnalysisResult:
 
     Retorna novo AnalysisResult com labels de classificação normalizados
     via normalize_label(). Função pura — nunca modifica result original.
-
-    Args:
-        result: AnalysisResult a normalizar.
-
-    Returns:
-        Novo AnalysisResult com labels normalizados.
-
-    Examples:
-        >>> ar = AnalysisResult(..., project_type="biblioteca", ...)
-        >>> normalized = normalize_analysis_result(ar)
-        >>> normalized.project_type
-        'other'
-        >>> ar.project_type  # original inalterado
-        'biblioteca'
     """
     normalized_project_type = normalize_label(result.project_type, "project_type")
     normalized_pr_nature = normalize_label(result.pr_nature, "pr_nature")
