@@ -153,7 +153,6 @@ textarea {
     color: #f8fafc !important;
   }
 
-  /* Dias fora do mês */
 
   [data-baseweb="calendar"] td[aria-disabled="true"] {
     background-color: #111827 !important;
@@ -161,7 +160,6 @@ textarea {
     color: #475569 !important;
   }
 
-  /* Células vazias */
 
   [data-baseweb="calendar"] td {
     background-color: #1e293b !important;
@@ -175,35 +173,24 @@ textarea {
   border-radius: 12px !important;
 }
 
-/* Campo interno */
-
 [data-baseweb="input"] input {
   background-color: #111827 !important;
 
   color: #f8fafc !important;
 }
 
-/* Área
-
-/* Header calendário */
 
 [data-baseweb="calendar"] * {
   color: #f8fafc !important;
 }
 
-/* Dias */
-
 [data-baseweb="calendar"] td {
   border-radius: 10px !important;
 }
 
-/* Hover dias */
-
 [data-baseweb="calendar"] td:hover {
   background-color: rgba(124, 58, 237, 0.18) !important;
 }
-
-/* Dia selecionado */
 
 [data-baseweb="calendar"] [aria-selected="true"] {
   background-color: #7c3aed !important;
@@ -213,7 +200,6 @@ textarea {
   border-radius: 999px !important;
 }
 
-/* Espaçamento filtros */
 
 .stMultiSelect,
 .stSelectbox,
@@ -281,7 +267,6 @@ hr {
   font-family: inherit;
 }
 
-/* Upload container */
 
 [data-testid="stFileUploader"] {
   background: linear-gradient(
@@ -301,15 +286,11 @@ hr {
   transition: 0.2s ease;
 }
 
-/* Hover */
-
 [data-testid="stFileUploader"]:hover {
   border: 1px dashed rgba(124, 58, 237, 0.55) !important;
 
   box-shadow: 0 0 24px rgba(124, 58, 237, 0.12);
 }
-
-/* Área interna */
 
 [data-testid="stFileUploaderDropzone"] {
   background: transparent !important;
@@ -317,13 +298,9 @@ hr {
   border: none !important;
 }
 
-/* Texto */
-
 [data-testid="stFileUploader"] * {
   color: #f8fafc !important;
 }
-
-/* Botão Browse files */
 
 [data-testid="stBaseButton-secondary"] {
   background: linear-gradient(
@@ -343,15 +320,12 @@ hr {
   transition: 0.2s ease !important;
 }
 
-/* Hover botão */
-
 [data-testid="stBaseButton-secondary"]:hover {
   border: 1px solid rgba(124, 58, 237, 0.55) !important;
 
   box-shadow: 0 0 16px rgba(124, 58, 237, 0.14);
 }
 
-/* Toast */
 
 [data-testid="stToast"] {
   background: linear-gradient(135deg, #111827, #1e293b) !important;
@@ -365,13 +339,11 @@ hr {
   box-shadow: 0 0 24px rgba(124, 58, 237, 0.14);
 }
 
-/* Texto do toast */
 
 [data-testid="stToast"] * {
   color: #f8fafc !important;
 }
 
-/* Toast */
 
 [data-testid="stToast"] {
   background: linear-gradient(
@@ -396,15 +368,12 @@ hr {
   transition: 0.2s ease;
 }
 
-/* Texto do toast */
 
 [data-testid="stToast"] * {
   color: #ecfdf5 !important;
 
   font-weight: 600;
 }
-
-/* Hover */
 
 [data-testid="stToast"]:hover {
   box-shadow:

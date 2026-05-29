@@ -114,24 +114,7 @@ def _build_analysis_result(
     )
 
 
-def _extract_field_from_json(
-    response: str,
-    field: str,
-) -> str:
-    """
-    Extrai campo JSON retornado pelo LLM
-    e normaliza para o vocabulário controlado.
-    """
 
-    raw_value = _parse_json_response(
-        response,
-        field,
-    )
-
-    return normalize_label(
-        raw_value,
-        field,
-    )
 
 # ---------------------------------------------------------------------------
 # Interface Pública — Classificadores
