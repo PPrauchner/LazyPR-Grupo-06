@@ -31,6 +31,10 @@ import time
 import itertools
 import functools
 from typing import Generator, Iterator
+from xml.parsers.expat import model
+from dotenv import load_dotenv
+
+load_dotenv()
 
 try:
     from groq import Groq
@@ -44,8 +48,9 @@ from core.models.pr_record import PRRecord
 # ---------------------------------------------------------------------------
 
 _MAX_RETRIES: int = 3
-_BACKOFF_FACTOR: float = 0.5  # segundos — base para backoff exponencial
+_BACKOFF_FACTOR: float = 0.5
 
+_DEFAULT_MODEL = "llama-3.1-8b-instant"
 
 # ---------------------------------------------------------------------------
 # Helpers privados
@@ -258,7 +263,11 @@ def classify_project_type_batch(records: tuple[PRRecord, ...]) -> str:
 
     # Configurações lidas dentro do escopo da função — sem estado global
     api_key = os.getenv("GROQ_API_KEY")
-    model = os.getenv("LAZYPR_MODEL", "llama3-8b-8192")
+    model = "llama-3.1-8b-instant"
+
+    print("=" * 60)
+    print("MODEL USADO:", model)
+    print("=" * 60)
     max_chars = int(os.getenv("LAZYPR_MAX_BODY_CHARS", "1500"))
 
     client = _build_client(api_key)
@@ -301,7 +310,11 @@ def classify_pr_nature_single(record: PRRecord) -> str:
     )
 
     api_key = os.getenv("GROQ_API_KEY")
-    model = os.getenv("LAZYPR_MODEL", "llama3-8b-8192")
+    model = "llama-3.1-8b-instant"
+
+    print("=" * 60)
+    print("MODEL USADO:", model)
+    print("=" * 60)
 
     client = _build_client(api_key)
     return _invoke_with_retry(client=client, model=model, prompt=prompt)
@@ -339,7 +352,11 @@ def classify_clarity_single(record: PRRecord) -> str:
     )
 
     api_key = os.getenv("GROQ_API_KEY")
-    model = os.getenv("LAZYPR_MODEL", "llama3-8b-8192")
+    model = "llama-3.1-8b-instant"
+
+    print("=" * 60)
+    print("MODEL USADO:", model)
+    print("=" * 60)
 
     client = _build_client(api_key)
     return _invoke_with_retry(client=client, model=model, prompt=prompt)

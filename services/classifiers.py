@@ -44,10 +44,11 @@ from typing import Generator, Iterable
 from core.models.analysis_result import AnalysisResult
 from core.models.pr_record import PRRecord
 from core.transforms.normalizing import (
-    compute_char_count,
-    compute_word_count,
+    calculate_char_count,
+    calculate_word_count,
     normalize_label,
 )
+
 from services.llm_client import (
     classify_project_type_batch,
     classify_pr_nature_single,
@@ -108,17 +109,29 @@ def _build_analysis_result(
         project_type=project_type,
         pr_nature=pr_nature,
         clarity_level=clarity_level,
-        char_count=compute_char_count(record.body),
-        word_count=compute_word_count(record.body),
+        char_count=calculate_char_count(record.body),
+        word_count=calculate_word_count(record.body),
     )
 
 
-def _extract_field_from_json(response: str, field: str) -> str:
-    """Extrai field específico de resposta JSON do LLM com normalização."""
-    raw_value = _parse_json_response(response, field)
-    # Já ajustado para aceitar apenas um argumento conforme a tua implementação
-    return normalize_label(raw_value)
+def _extract_field_from_json(
+    response: str,
+    field: str,
+) -> str:
+    """
+    Extrai campo JSON retornado pelo LLM
+    e normaliza para o vocabulário controlado.
+    """
 
+    raw_value = _parse_json_response(
+        response,
+        field,
+    )
+
+    return normalize_label(
+        raw_value,
+        field,
+    )
 
 # ---------------------------------------------------------------------------
 # Interface Pública — Classificadores
