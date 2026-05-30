@@ -172,13 +172,32 @@ def render_home(
 
     st.subheader("Visão Geral")
 
+    # Calcular KPIs dinamicamente (não hardcoded)
+    from core.aggregations.counters import count_by_language, count_by_project_type
+
+    total_prs = len(records)
+    languages = count_by_language(records)
+    projects = count_by_project_type(records)
+
+    # Calcular clareza média (aproximada)
+    clarity_values = {
+        "insufficient": 1,
+        "basic": 2,
+        "good": 3,
+        "excellent": 4,
+    }
+    clarity_avg = sum(clarity_values.get(r.clarity_level, 0) for r in records) / max(
+        total_prs, 1
+    )
+    clarity_avg = round(clarity_avg, 2)
+
     kpi_col1, kpi_col2, kpi_col3, kpi_col4 = st.columns(4)
 
     with kpi_col1:
 
         metric_card(
             label="Total PRs",
-            value=str(len(records)),
+            value=str(total_prs),
             icon="📦",
             delta="+14%",
         )
@@ -187,7 +206,7 @@ def render_home(
 
         metric_card(
             label="Linguagens",
-            value="18",
+            value=str(len(languages)),
             icon="💻",
             delta="+3",
         )
@@ -196,7 +215,7 @@ def render_home(
 
         metric_card(
             label="Projetos",
-            value="42",
+            value=str(len(projects)),
             icon="🧩",
             delta="+7%",
         )
@@ -205,7 +224,7 @@ def render_home(
 
         metric_card(
             label="Clareza Média",
-            value="8.7",
+            value=str(clarity_avg),
             icon="✨",
             delta="+0.6",
         )
