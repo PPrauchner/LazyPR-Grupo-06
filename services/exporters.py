@@ -59,7 +59,7 @@ def enrich_records(
     return records
 
 
-def analysis_result_to_dict(result: AnalysisResult) -> dict:
+def _analysis_result_to_dict(result: AnalysisResult) -> dict:
     """Converte um `AnalysisResult` em dicionário alinhado com `CSV_FIELDNAMES`.
 
     Args:
