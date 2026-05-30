@@ -16,7 +16,6 @@ from services.classifiers import (
     classify_project_type,
     classify_pr_nature,
     classify_clarity,
-    _parse_json_response,
     _build_analysis_result,
     _extract_field_from_json,
 )
