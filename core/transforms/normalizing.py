@@ -31,7 +31,7 @@ Relacionado a:
 from __future__ import annotations
 
 import functools
-from typing import Optional
+from typing import Optional, NamedTuple
 
 from core.models.analysis_result import AnalysisResult
 from core.models.pr_record import PRRecord
@@ -66,7 +66,6 @@ _LANGUAGE_VARIANTS = {
 # ---------------------------------------------------------------------------
 # Funções Puras de Normalização
 # ---------------------------------------------------------------------------
-
 
 @functools.lru_cache(maxsize=256)
 def normalize_language(text: str | None) -> str | None:
@@ -116,7 +115,7 @@ def normalize_label(label: str, field: str) -> str:
     """
     if not label:
         return "other"
-
+        
     normalized_label = label.strip().lower().replace("-", "_")
 
     # Seleciona vocabulário correto baseado no campo
@@ -142,21 +141,18 @@ def normalize_pr_record(record: PRRecord) -> PRRecord:
     return record._replace(language=normalized_language)
 
 
-def normalize_analysis_result(
-    result: AnalysisResult,
-) -> AnalysisResult:
+def normalize_analysis_result(result: AnalysisResult) -> AnalysisResult:
+    """Normaliza campos de um AnalysisResult para vocabulário controlado.
+
+    Retorna novo AnalysisResult com labels de classificação normalizados
+    via normalize_label(). Função pura — nunca modifica result original.
+    """
+    normalized_project_type = normalize_label(result.project_type, "project_type")
+    normalized_pr_nature = normalize_label(result.pr_nature, "pr_nature")
+    normalized_clarity_level = normalize_label(result.clarity_level, "clarity_level")
 
     return result._replace(
-        project_type=normalize_label(
-            result.project_type,
-            "project_type",
-        ),
-        pr_nature=normalize_label(
-            result.pr_nature,
-            "pr_nature",
-        ),
-        clarity_level=normalize_label(
-            result.clarity_level,
-            "clarity_level",
-        ),
+        project_type=normalized_project_type,
+        pr_nature=normalized_pr_nature,
+        clarity_level=normalized_clarity_level,
     )

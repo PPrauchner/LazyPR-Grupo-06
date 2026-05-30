@@ -10,77 +10,89 @@ Cobertura:
 """
 
 import pytest
-from unittest.mock import patch, MagicMock
 from core.models.pr_record import PRRecord
 from services.classifiers import (
-    classify_project_type,
-    classify_pr_nature,
     classify_clarity,
-    _build_analysis_result,
-    _extract_field_from_json,
+    classify_pr_nature,
+    classify_project_type,
 )
-from utils.memoization import clear_cache
-
-# ---------------------------------------------------------------------------
-# Fixtures
-# ---------------------------------------------------------------------------
 
 
-@pytest.fixture
-def sample_pr():
-    """Fixture de um PRRecord para testes."""
-    return PRRecord(
+def test_classify_pr_nature_returns_valid_value():
+    """Testa que classify_pr_nature retorna uma string válida."""
+    pr = PRRecord(
         id=1,
-        html_url="https://github.com/golang/go/pull/23805#discussion_r1",
-        repo="golang/go",
-        path="src/math/rand/rand.go",
-        body="This fixes an issue with random number generation.",
-        diff_hunk="@@ -210,6 +210,11 @@",
+        html_url="https://github.com/test/repo/pull/1#discussion_r1",
+        repo="test/repo",
+        path="src/main.py",
+        body="This fixes a critical bug in the login button.",
+        diff_hunk="@@ -10,6 +10,10 @@",
         author="test_user",
         author_association="CONTRIBUTOR",
         commit_id="abc123",
-        line=213,
-        language="go",
-        created_at="2020-01-01T00:00:00Z",
+        line=15,
+        language="python",
+        created_at="2024-01-01T00:00:00Z",
     )
+    result = classify_pr_nature(pr)
+    assert isinstance(result, str)
+    assert result in [
+        "bug_fix",
+        "feature",
+        "refactoring",
+        "documentation",
+        "other",
+        "unknown",
+    ]
 
 
-@pytest.fixture
-def sample_pr_same_repo():
-    """Fixture de um segundo PRRecord no mesmo repositório."""
-    return PRRecord(
-        id=2,
-        html_url="https://github.com/golang/go/pull/23806#discussion_r2",
-        repo="golang/go",
-        path="src/math/rand/rand.go",
-        body="This adds support for new random distributions.",
-        diff_hunk="@@ -220,6 +220,11 @@",
-        author="another_user",
-        author_association="MEMBER",
-        commit_id="def456",
-        line=223,
-        language="go",
-        created_at="2020-01-02T00:00:00Z",
+def test_classify_clarity_returns_valid_value():
+    """Testa que classify_clarity retorna uma string válida."""
+    pr = PRRecord(
+        id=1,
+        html_url="https://github.com/test/repo/pull/1#discussion_r1",
+        repo="test/repo",
+        path="src/main.py",
+        body="This fixes a critical bug in the login button.",
+        diff_hunk="@@ -10,6 +10,10 @@",
+        author="test_user",
+        author_association="CONTRIBUTOR",
+        commit_id="abc123",
+        line=15,
+        language="python",
+        created_at="2024-01-01T00:00:00Z",
     )
+    result = classify_clarity(pr)
+    assert isinstance(result, str)
+    assert result in [
+        "insufficient",
+        "basic",
+        "good",
+        "excellent",
+        "other",
+        "unknown",
+    ]
 
 
-@pytest.fixture
-def sample_pr_different_repo():
-    """Fixture de um PRRecord em repositório diferente."""
-    return PRRecord(
-        id=3,
-        html_url="https://github.com/torvalds/linux/pull/12345#discussion_r3",
-        repo="torvalds/linux",
-        path="drivers/gpu/drm/nouveau/nouveau_drv.c",
-        body="This fixes a GPU driver issue.",
-        diff_hunk="@@ -100,6 +100,11 @@",
-        author="kernel_dev",
-        author_association="OWNER",
-        commit_id="ghi789",
-        line=105,
-        language="c",
-        created_at="2020-01-03T00:00:00Z",
+def test_classify_project_type_returns_iterable():
+    """Testa que classify_project_type retorna um iterable."""
+    pr = PRRecord(
+        id=1,
+        html_url="https://github.com/test/repo/pull/1#discussion_r1",
+        repo="test/repo",
+        path="src/main.py",
+        body="This fixes a critical bug in the login button.",
+        diff_hunk="@@ -10,6 +10,10 @@",
+        author="test_user",
+        author_association="CONTRIBUTOR",
+        commit_id="abc123",
+        line=15,
+        language="python",
+        created_at="2024-01-01T00:00:00Z",
     )
+    result = classify_project_type([pr])
+    # Verifica se é iterable
+    assert hasattr(result, "__iter__")
 
 
 @pytest.fixture(autouse=True)

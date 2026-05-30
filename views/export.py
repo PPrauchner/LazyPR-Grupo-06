@@ -24,10 +24,10 @@ import streamlit as st
 from core.aggregations.counters import count_by
 from ui.components import data_table, download_buttons, metric_card, status_banner
 
+st.set_page_config(page_title="LazyPR - Exportar", page_icon="💾")
 
-def render_export_page(
-    results,
-) -> None:
+
+def render() -> None:
     """Orquestra a renderização da página de exportação.
 
     Lê os resultados de `st.session_state["results"]`, materializa em tupla
@@ -42,16 +42,16 @@ def render_export_page(
     """
     st.title("💾 Exportar Resultados")
 
-    if not results:
-
+    if "results" not in st.session_state or not st.session_state["results"]:
         status_banner(
-            "Nenhum resultado disponível.",
+            "Nenhum dado processado disponível. "
+            "Por favor, retorne à página de Upload e inicie uma análise.",
             status_type="warning",
         )
-
+        st.stop()
         return
 
-    results = tuple(results)
+    results = tuple(st.session_state["results"])
 
     st.subheader("Resumo do Arquivo")
     col1, col2, _ = st.columns(3)
@@ -72,3 +72,6 @@ def render_export_page(
 
     st.subheader("Opções de Download")
     download_buttons(results)
+
+
+render()
