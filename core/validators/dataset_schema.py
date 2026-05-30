@@ -3,9 +3,15 @@ Validação estrutural de datasets CSV.
 """
 
 REQUIRED_COLUMNS = (
-    "title",
-    "language",
-    "created_at",
+    "id",
+    "html_url",
+    "path",
+    "body",
+    "diff_hunk",
+    "user",
+    "author_association",
+    "commit_id",
+    "line",
 )
 
 OPTIONAL_COLUMNS = (
