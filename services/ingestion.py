@@ -214,31 +214,19 @@ def stream_json(
 
 def ingest_dataset(
     uploaded_file,
-) -> tuple[PRRecord, ...]:
+):
     """
-    Executa pipeline principal de ingestão.
+    Executa pipeline principal de ingestão, retornando gerador lazy.
     """
 
     filename = uploaded_file.name.lower()
 
     if filename.endswith(".csv"):
-
-        records = tuple(
-            stream_csv(
-                uploaded_file,
-            )
-        )
+        return stream_csv(uploaded_file)
 
     elif filename.endswith(".json"):
-
-        records = tuple(
-            stream_json(
-                uploaded_file,
-            )
-        )
+        return stream_json(uploaded_file)
 
     else:
 
         raise ValueError("Formato de arquivo não suportado.")
-
-    return records
