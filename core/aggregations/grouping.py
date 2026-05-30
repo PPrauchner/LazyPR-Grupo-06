@@ -31,7 +31,6 @@ Relacionado a:
 
 from functools import reduce, lru_cache
 from typing import Callable, Iterable, Any, Dict, Tuple
-from collections import Counter
 
 
 def group_by(
@@ -58,52 +57,10 @@ def group_by(
 
     return reduce(reducer, records, {})
 
-def aggregate_by_language(
-    records,
-):
-    """
-    Agrupa PRs por linguagem.
-    """
 
-    counter = Counter(
-        record.language
-        for record in records
-        if record.language
-    )
-
-    return tuple(
-        sorted(
-            counter.items(),
-            key=lambda item: item[1],
-            reverse=True,
-        )
-    )
-
-
-def aggregate_by_pr_nature(records):
-
-    counter = Counter(record.pr_nature for record in records if record.pr_nature)
-
-    return tuple(
-        sorted(
-            counter.items(),
-            key=lambda item: item[1],
-            reverse=True,
-        )
-    )
-
-
-def aggregate_by_project_type(records):
-
-    counter = Counter(record.project_type for record in records if record.project_type)
-
-    return tuple(
-        sorted(
-            counter.items(),
-            key=lambda item: item[1],
-            reverse=True,
-        )
-    )
+# REMOVER FUNÇÕES DUPLICATE - USE core/aggregations/counters.py EM VEZ DISSO
+# As views devem chamar count_by_language(), count_by_project_type(), count_by_pr_nature()
+# de core.aggregations.counters em vez de aggregate_by_* aqui
 
 
 def group_by_language_and_clarity(
