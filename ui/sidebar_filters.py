@@ -72,11 +72,17 @@ PAGES = (
 
 
 def get_active_filters() -> Predicate:
-    """
-    Retorna predicado funcional composto
-    baseado nos filtros ativos.
-    """
+    """Retorna predicado funcional composto baseado nos filtros ativos.
 
+    Lógica: (language1 OR language2 OR ...) AND (type1 OR type2 OR ...) AND ...
+
+    Cada dimensão tem OR interno (múltiplas seleções na mesma dimensão = OR).
+    Entre dimensões: AND (todos os filtros ativos devem ser satisfeitos).
+
+    Returns:
+        Predicate (Callable[[AnalysisResult], bool]) que retorna True se o registro
+        satisfaz todos os critérios ativos.
+    """
     active_predicates = []
 
     selected_languages = st.session_state.get(
@@ -112,36 +118,20 @@ def get_active_filters() -> Predicate:
         "end_date",
     )
 
-    active_predicates.extend(
-        map(
-            lambda language: by_language((language,)),
-            selected_languages,
-        )
-    )
+    # UM predicado por dimensão (OR dentro de cada uma)
+    if selected_languages:
+        active_predicates.append(by_language(selected_languages))
 
-    active_predicates.extend(
-        map(
-            lambda project_type: by_project_type((project_type,)),
-            selected_project_types,
-        )
-    )
+    if selected_project_types:
+        active_predicates.append(by_project_type(selected_project_types))
 
-    active_predicates.extend(
-        map(
-            lambda pr_nature: by_pr_nature((pr_nature,)),
-            selected_natures,
-        )
-    )
+    if selected_natures:
+        active_predicates.append(by_pr_nature(selected_natures))
 
-    active_predicates.extend(
-        map(
-            lambda clarity: by_clarity_level((clarity,)),
-            selected_clarity,
-        )
-    )
+    if selected_clarity:
+        active_predicates.append(by_clarity_level(selected_clarity))
 
     if use_date_filter and start_date and end_date:
-
         active_predicates.append(
             is_in_date_range(
                 start_date,
@@ -241,13 +231,9 @@ def render_sidebar() -> dict:
                 key="end_date_input",
             )
 
-            st.session_state["start_date"] = (
-                start_date.strftime("%Y-%m-%d")
-            )
+            st.session_state["start_date"] = start_date.strftime("%Y-%m-%d")
 
-            st.session_state["end_date"] = (
-                end_date.strftime("%Y-%m-%d")
-            )
+            st.session_state["end_date"] = end_date.strftime("%Y-%m-%d")
 
         st.divider()
 
@@ -293,9 +279,7 @@ def render_sidebar() -> dict:
 
         st.divider()
 
-        st.caption(
-            "LazyPR • 2026"
-        )
+        st.caption("LazyPR • 2026")
 
     return {
         "page": selected_page,
