@@ -30,11 +30,13 @@ import os
 import time
 import itertools
 import functools
+import logging
 from typing import Generator, Iterator
-from xml.parsers.expat import model
 from dotenv import load_dotenv
 
 load_dotenv()
+
+logger = logging.getLogger(__name__)
 
 try:
     from groq import Groq
@@ -264,10 +266,7 @@ def classify_project_type_batch(records: tuple[PRRecord, ...]) -> str:
     # Configurações lidas dentro do escopo da função — sem estado global
     api_key = os.getenv("GROQ_API_KEY")
     model = "llama-3.1-8b-instant"
-
-    print("=" * 60)
-    print("MODEL USADO:", model)
-    print("=" * 60)
+    logger.debug(f"Usando modelo LLM: {model} para classify_project_type_batch")
     max_chars = int(os.getenv("LAZYPR_MAX_BODY_CHARS", "1500"))
 
     client = _build_client(api_key)
@@ -311,10 +310,7 @@ def classify_pr_nature_single(record: PRRecord) -> str:
 
     api_key = os.getenv("GROQ_API_KEY")
     model = "llama-3.1-8b-instant"
-
-    print("=" * 60)
-    print("MODEL USADO:", model)
-    print("=" * 60)
+    logger.debug(f"Usando modelo LLM: {model} para classify_pr_nature_single")
 
     client = _build_client(api_key)
     return _invoke_with_retry(client=client, model=model, prompt=prompt)
@@ -353,10 +349,7 @@ def classify_clarity_single(record: PRRecord) -> str:
 
     api_key = os.getenv("GROQ_API_KEY")
     model = "llama-3.1-8b-instant"
-
-    print("=" * 60)
-    print("MODEL USADO:", model)
-    print("=" * 60)
+    logger.debug(f"Usando modelo LLM: {model} para classify_clarity_single")
 
     client = _build_client(api_key)
     return _invoke_with_retry(client=client, model=model, prompt=prompt)
