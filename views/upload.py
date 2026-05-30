@@ -26,6 +26,11 @@ from services.ingestion import (
     ingest_dataset,
 )
 
+from core.pipeline.runner import (
+    run_pipeline,
+    PipelineConfig,
+)
+
 
 def _validate_schema(
     uploaded_file: UploadedFile,
@@ -69,7 +74,7 @@ def _validate_schema(
 
 def render_upload_page() -> None:
     """
-    Renderiza página de upload.
+    Renderiza página de upload com lógica de ingestão.
     """
 
     st.title("📂 Carregar Dataset")
@@ -99,37 +104,39 @@ def render_upload_page() -> None:
 
         st.stop()
 
-if st.button(
-    "Iniciar Análise 🚀",
-    width="stretch",
-    key="btn_iniciar_analise",
-):
-
-    with st.spinner(
-        "Processando dataset..."
+    # BOTÃO DENTRO DA FUNÇÃO (não no escopo global)
+    if st.button(
+        "Iniciar Análise 🚀",
+        width="stretch",
+        key="btn_iniciar_analise",
     ):
 
-        try:
+        with st.spinner("Processando dataset..."):
 
-            records = ingest_dataset(
-                uploaded_file,
-            )
+            try:
 
-            st.session_state[
-                "analysis_results"
-            ] = records
+                records_iter = ingest_dataset(
+                    uploaded_file,
+                )
 
-            st.session_state[
-                "dataset_name"
-            ] = uploaded_file.name
+                config = PipelineConfig(
+                    enable_cleaning=True,
+                    enable_normalization=True,
+                    enable_filtering=False,
+                    enable_classification=True,
+                )
 
-            st.success(
-                f"Dataset processado com sucesso. "
-                f"{len(records)} registros carregados."
-            )
+                analysis_stream = run_pipeline(records_iter, config)
+                records_list = list(analysis_stream)
 
-        except Exception as exc:
+                st.session_state["analysis_results"] = records_list
+                st.session_state["dataset_name"] = uploaded_file.name
 
-            st.error(
-                f"Erro durante o processamento: {exc}"
-            )
+                st.success(
+                    f"Dataset processado com sucesso. "
+                    f"{len(records_list)} registros carregados."
+                )
+
+            except Exception as exc:
+
+                st.error(f"Erro durante o processamento: {exc}")
