@@ -20,10 +20,10 @@ from core.aggregations.metrics import (
     word_distribution,
 )
 
-from core.aggregations.grouping import (
-    aggregate_by_language,
-    aggregate_by_project_type,
-    aggregate_by_pr_nature,
+from core.aggregations.counters import (
+    count_by_language,
+    count_by_project_type,
+    count_by_pr_nature,
 )
 
 from core.transforms.filtering import (
@@ -262,21 +262,21 @@ def render_overview(
     active_filter = get_active_filters()
 
     filtered_records = tuple(
-    apply_filters(
-        active_filter,
-        records,
+        apply_filters(
+            active_filter,
+            records,
+        )
     )
-    )
- 
-    language_data = aggregate_by_language(
+
+    language_data = count_by_language(
         filtered_records,
     )
 
-    project_type_data = aggregate_by_project_type(
+    project_type_data = count_by_project_type(
         filtered_records,
     )
 
-    pr_nature_data = aggregate_by_pr_nature(
+    pr_nature_data = count_by_pr_nature(
         filtered_records,
     )
 
@@ -285,10 +285,6 @@ def render_overview(
     )
 
     render_header()
-
-    total_records = len(
-    filtered_records,
-    )
 
     render_kpis(
         total_records,
