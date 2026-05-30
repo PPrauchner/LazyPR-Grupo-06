@@ -44,7 +44,7 @@ def render_correlation_dashboard(
 
     filtered_records = tuple(
         apply_filters(
-            (active_filter,),
+            active_filter,
             records,
         )
     )
