@@ -168,33 +168,25 @@ def apply_filters(
     predicate,
     records,
 ):
-    return filter(
-        predicate,
-        records,
-    )
+    """Aplica um predicado composto aos registros.
 
-    """
-    Aplica um predicado composto aos registros.
-    """
-
-    return filter(
-        predicate,
-        records,
-    )
-    """
-    Aplica um pipeline de filtros encadeados a um stream de registros utilizando avaliação preguiçosa (lazy evaluation).
-
-    Encapsula a composição e a filtragem em uma única operação puramente funcional.
-    A utilização de `filter()` garante que os registros não sejam materializados em memória
-    (evitando `list()`), processando o dataset iterativamente sob demanda.
+    Utiliza lazy evaluation com filter() para evitar materialização de listas.
+    Aceita um predicado único ou uma tuple de predicados que serão compostos.
 
     Args:
-        predicates: Iterável com as condições de filtragem a serem compostas e aplicadas.
-        records: Stream lazy (gerador ou iterável) de registros (AnalysisResult)
-            a serem validados.
+        predicate: Função (AnalysisResult → bool) OU tuple de funções
+        records: Stream lazy de registros.
 
     Returns:
-        Um iterador preguiçoso (objeto `filter`) que cede exclusivamente os
-        registros que satisfazem todos os critérios da composição lógica.
+        Iterator de registros que satisfazem o predicado.
     """
-    return filter(compose_predicates(predicates), records)
+    # Se predicate for uma tuple, compor os predicados
+    if isinstance(predicate, tuple):
+        final_predicate = compose_predicates(predicate)
+    else:
+        final_predicate = predicate
+
+    return filter(
+        final_predicate,
+        records,
+    )
