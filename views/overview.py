@@ -46,13 +46,6 @@ from ui.components import (
 )
 
 
-def render_overview(records):
-
-    if not records:
-        st.warning("Nenhum resultado processado disponível.")
-        return
-
-
 def _count_total_records(
     records: Iterable[Any],
 ) -> int:

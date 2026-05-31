@@ -32,7 +32,7 @@ Predicate = Callable[[AnalysisResult], bool]
 
 def by_language(languages: tuple[str, ...]) -> Predicate:
     allowed = frozenset(map(str.lower, languages))
-    return lambda record: record.language.lower() in allowed
+    return lambda record: (record.language or "").lower() in allowed
 
 
 def is_language(language: str) -> Predicate:
@@ -42,7 +42,7 @@ def is_language(language: str) -> Predicate:
 
 def by_project_type(project_types: tuple[str, ...]) -> Predicate:
     allowed = frozenset(map(str.lower, project_types))
-    return lambda record: record.project_type.lower() in allowed
+    return lambda record: (record.project_type or "").lower() in allowed
 
 
 def by_pr_nature(pr_natures: tuple[str, ...]) -> Predicate:
@@ -53,7 +53,7 @@ def by_pr_nature(pr_natures: tuple[str, ...]) -> Predicate:
     como "bug_fix", "feature", "refactoring", "documentation" e "other".
     """
     allowed = frozenset(map(str.lower, pr_natures))
-    return lambda record: record.pr_nature.lower() in allowed
+    return lambda record: (record.pr_nature or "").lower() in allowed
 
 
 def has_pr_nature(pr_nature: str) -> Predicate:
@@ -63,7 +63,7 @@ def has_pr_nature(pr_nature: str) -> Predicate:
 
 def by_clarity_level(clarity_levels: tuple[str, ...]) -> Predicate:
     allowed = frozenset(map(str.lower, clarity_levels))
-    return lambda record: record.clarity_level.lower() in allowed
+    return lambda record: (record.clarity_level or "").lower() in allowed
 
 
 def is_in_date_range(

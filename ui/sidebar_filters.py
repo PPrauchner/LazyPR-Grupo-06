@@ -45,13 +45,14 @@ PROJECT_TYPES = (
     "Framework",
     "Library",
     "CLI",
-    "Tool",
+    "Web App",
+    "Other",
 )
 
 PR_NATURES = (
     "bug_fix",
     "feature",
-    "refactor",
+    "refactoring",
     "documentation",
 )
 

@@ -153,7 +153,7 @@ def run_pipeline(
         predicate = get_active_filters()
 
         stream = apply_filters(
-            (predicate,),
+            [predicate],
             stream,
         )
 

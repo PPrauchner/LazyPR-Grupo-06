@@ -18,7 +18,7 @@ Relacionado a:
     - Conceito-Chave 02 (memoização para caching de chamadas LLM)
 """
 
-from typing import Any, Callable, Dict, Generator, TypeVar
+from typing import Any, Callable, Generator, TypeVar
 
 from services.storage import has_cached_analysis, load_results, save_results
 
@@ -57,25 +57,12 @@ def cached_classify(
 
 
 def clear_cache() -> None:
-    """Limpa todo o cache em memória.
+    """Limpa caches LRU de funções puras (normalize_language, normalize_label).
 
-    Nota: Não afeta arquivos persistidos em disco.
-    Útil para "reset cache" na interface ou entre testes.
+    Não afeta arquivos persistidos em disco (storage.py).
+    Utilizado em testes para garantir estado limpo entre execuções.
     """
-    with _cache_lock:
-        _in_memory_cache.clear()
+    from core.transforms.normalizing import normalize_language, normalize_label
+    normalize_language.cache_clear()
+    normalize_label.cache_clear()
 
-
-def get_cache_stats() -> Dict[str, int]:
-    """Retorna estatísticas de cache (hits, misses, total).
-
-    Returns:
-        Dict com chaves 'hits', 'misses', 'total'.
-    """
-    with _stats_lock:
-        total = _cache_stats["hits"] + _cache_stats["misses"]
-        return {
-            "hits": _cache_stats["hits"],
-            "misses": _cache_stats["misses"],
-            "total": total,
-        }

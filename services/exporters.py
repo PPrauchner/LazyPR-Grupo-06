@@ -85,6 +85,8 @@ def _write_csv_to_stream(stream: TextIO, results: Iterable[AnalysisResult]) -> N
     """
     writer = csv.DictWriter(stream, fieldnames=CSV_FIELDNAMES)
     writer.writeheader()
+    # Laço justificado: writer.writerow() é efeito colateral de I/O sem valor de retorno útil;
+    # map() expressaria transformação, não escrita sequencial — for é semanticamente correto aqui.
     for result in results:
         writer.writerow(_analysis_result_to_dict(result))
 
@@ -101,6 +103,8 @@ def _write_json_to_stream(stream: TextIO, results: Iterable[AnalysisResult]) -> 
             `io.StringIO()`).
         results (Iterable[AnalysisResult]): Registros a serializar.
     """
+    # Laço justificado: stream.write() é efeito colateral de I/O sem valor de retorno útil;
+    # map() expressaria transformação, não escrita sequencial — for é semanticamente correto aqui.
     for result in results:
         row = _analysis_result_to_dict(result)
         stream.write(json.dumps(row, ensure_ascii=False) + "\n")

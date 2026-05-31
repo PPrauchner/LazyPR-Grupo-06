@@ -85,6 +85,8 @@ def load_results(repo_hash: str) -> Generator[AnalysisResult, None, None]:
             data = json.load(f)
 
         if isinstance(data, list):
+            # Laço justificado: yield com **unpacking exige generator function explícita;
+            # yield from map(lambda d: AnalysisResult(**d), data) seria equivalente mas menos legível.
             for item in data:
                 yield AnalysisResult(**item)
     except (json.JSONDecodeError, KeyError, TypeError):

@@ -24,16 +24,6 @@ import streamlit as st
 from core.aggregations.counters import count_by
 from ui.components import data_table, download_buttons, metric_card, status_banner
 
-st.set_page_config(page_title="LazyPR - Exportar", page_icon="💾")
-
-
-def render_export_page(records):
-
-    if not records:
-        st.warning("Nenhum resultado disponível.")
-        return
-
-
 def render_export_page(records=None) -> None:
     """
     Renderiza a página de exportação.

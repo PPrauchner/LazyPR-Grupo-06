@@ -48,8 +48,6 @@ class PRRecord(NamedTuple):
         created_at: Data de criação no ISO format (None se ausente).
     """
 
-    from typing import NamedTuple
-
     id: int
     html_url: str
     repo: str
