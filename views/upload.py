@@ -6,6 +6,7 @@ pull requests públicos do GitHub. Após o upload, o pipeline
 funcional inicia o processamento lazy dos registros utilizando
 geradores Python, evitando carregamento completo em memória.
 """
+
 import streamlit as st
 from streamlit.runtime.uploaded_file_manager import UploadedFile
 
@@ -36,57 +37,155 @@ def _validate_schema(uploaded_file: UploadedFile) -> bool:
 
 def render_upload_page() -> None:
     """Renderiza os componentes visuais e orquestra o pipeline."""
+
     st.title("📂 Carregar Dataset")
 
-    uploaded_file = st.file_uploader("Selecione o arquivo CSV", type=["csv"])
+    # ---------------------------------------------------------
+    # Análise já concluída
+    # ---------------------------------------------------------
+
+    if st.session_state.get("analysis_ready", False):
+
+        st.success("✅ Análise pronta!")
+
+        col1, col2 = st.columns(2)
+
+        with col1:
+
+            if st.button("📊 Ver Análise"):
+
+                st.session_state["page_override"] = "📊 Overview"
+                st.rerun()
+
+        with col2:
+
+            if st.button("📂 Novo Upload"):
+
+                st.session_state.pop(
+                    "analysis_results",
+                    None,
+                )
+
+                st.session_state.pop(
+                    "analysis_ready",
+                    None,
+                )
+
+                st.session_state.pop(
+                    "pipeline_stats",
+                    None,
+                )
+
+                st.rerun()
+
+        return
+
+    # ---------------------------------------------------------
+    # Upload
+    # ---------------------------------------------------------
+
+    uploaded_file = st.file_uploader(
+        "Selecione o arquivo CSV",
+        type=["csv"],
+    )
 
     if uploaded_file is None:
+
         st.info("Aguardando upload...")
         return
 
-    # 1. Validação
+    # ---------------------------------------------------------
+    # Validação
+    # ---------------------------------------------------------
+
     if not _validate_schema(uploaded_file):
+
         st.stop()
 
-    st.success("Schema validado! O arquivo está pronto para o processamento.")
+    st.markdown(
+        """
+        <h4 style="margin-bottom:0;">
+            ✓ Dataset validado
+        </h4>
+        """,
+        unsafe_allow_html=True,
+    )
+
+    # ---------------------------------------------------------
+    # Execução
+    # ---------------------------------------------------------
 
     if st.button("Iniciar Análise 🚀"):
-        st.session_state["dataset_file"] = uploaded_file
-        
-        # 2. Rebobina o ponteiro e gera o hash para o sistema de cache
+
         uploaded_file.seek(0)
+
         with st.spinner("Verificando histórico de análises..."):
+
             file_hash, _ = hash_file_stream(uploaded_file)
-            
-        # 3. Execução do Fluxo
+
+        # -----------------------------------------------------
+        # CACHE
+        # -----------------------------------------------------
+
         if has_cached_analysis(file_hash):
-            status_banner("Resultados encontrados no cache. Carregando...", "info")
-            # Materializa os resultados convertendo o gerador em tupla
-            st.session_state["analysis_results"] = tuple(load_results(file_hash))
-            
-        else:
-            with st.spinner("Processando pipeline funcional e LLMs. Isso pode levar alguns minutos..."):
-                status_banner("Iniciando limpeza e avaliação semântica...", "info")
-                
-                uploaded_file.seek(0)
-                source_stream = stream_csv(uploaded_file)
-                
-                config = PipelineConfig(
-                    enable_normalization=True, 
-                    enable_classification=True
-                )
-                
-                resultados_lazy = run_pipeline(source_stream, config)
-                resultados_finais = tuple(resultados_lazy)
-                
-                save_results(file_hash, resultados_finais)
-                st.session_state["analysis_results"] = resultados_finais
 
-        status_banner("Análise concluída com sucesso!", "success")
-        
-        # 4. Redirecionamento 
-        st.switch_page("pages/overview.py")
+            with st.spinner("Carregando resultados do cache..."):
 
+                results = tuple(load_results(file_hash))
 
-if __name__ == "__main__":
-    render_upload_page()
+            st.session_state["analysis_results"] = results
+
+            st.session_state["pipeline_stats"] = {
+                "loaded": len(results),
+                "cleaned": len(results),
+                "normalized": len(results),
+                "classified": len(results),
+            }
+
+            st.session_state["analysis_ready"] = True
+            st.rerun()
+
+        # -----------------------------------------------------
+        # PIPELINE
+        # -----------------------------------------------------
+
+        with st.spinner("Processando pipeline funcional e LLMs..."):
+
+            uploaded_file.seek(0)
+
+            source_stream = stream_csv(uploaded_file)
+
+            config = PipelineConfig(
+                enable_normalization=True,
+                enable_classification=True,
+            )
+
+            resultados_lazy = run_pipeline(
+                source_stream,
+                config,
+            )
+
+            resultados_finais = tuple(resultados_lazy)
+
+        save_results(
+            file_hash,
+            resultados_finais,
+        )
+
+        st.session_state["analysis_results"] = resultados_finais
+
+        st.session_state["pipeline_stats"] = {
+            "loaded": len(resultados_finais),
+            "cleaned": len(resultados_finais),
+            "normalized": len(resultados_finais),
+            "classified": len(resultados_finais),
+        }
+
+        st.session_state["analysis_ready"] = True
+
+        status_banner(
+            "Análise concluída com sucesso!",
+            "success",
+        )
+
+        st.rerun()

@@ -62,12 +62,16 @@ def hash_file_stream(stream: IO[str]) -> Tuple[str, Generator[str, None, None]]:
     """
     sha256 = hashlib.sha256()
     for line in stream:
-        sha256.update(line.encode("utf-8"))
+        if isinstance(line, bytes):
+            sha256.update(line)
+        else:
+            sha256.update(line.encode("utf-8"))
 
     digest = sha256.hexdigest()
-    stream.seek(0)
-    return digest, (line for line in stream)
 
+    stream.seek(0)
+
+    return digest, (line for line in stream)
 
 def hash_record(pr_record: PRRecord) -> str:
     """Gera chave SHA-256 única de um PRRecord.

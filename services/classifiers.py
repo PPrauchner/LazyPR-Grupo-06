@@ -44,10 +44,11 @@ from typing import Generator, Iterable
 from core.models.analysis_result import AnalysisResult
 from core.models.pr_record import PRRecord
 from core.transforms.normalizing import (
-    compute_char_count,
-    compute_word_count,
+    calculate_char_count,
+    calculate_word_count,
     normalize_label,
 )
+
 from services.llm_client import (
     classify_project_type_batch,
     classify_pr_nature_single,
@@ -64,7 +65,7 @@ logger = logging.getLogger(__name__)
 
 _DEFAULT_PROJECT_TYPE = "other"
 _DEFAULT_PR_NATURE = "other"
-_DEFAULT_CLARITY_LEVEL = "other"
+_DEFAULT_CLARITY_LEVEL = "unknown"
 
 
 # ---------------------------------------------------------------------------
@@ -72,17 +73,53 @@ _DEFAULT_CLARITY_LEVEL = "other"
 # ---------------------------------------------------------------------------
 
 
-def _parse_json_response(raw_response: str, field: str) -> str:
-    """Extrai valor de JSON bruto do LLM com tratamento de erros."""
+def _extract_field_from_json(raw_response: str, field: str) -> str:
+    """Extrai e normaliza valor do JSON retornado pelo LLM.
+
+    Parse JSON bruto, extrai campo específico e normaliza via normalize_label().
+    Se parsing falhar ou campo não existir, retorna valor default apropriado.
+
+    Args:
+        raw_response: String JSON bruta do LLM
+        field: Campo a extrair ("project_type", "pr_nature", "clarity_level")
+
+    Returns:
+        Valor normalizado ou default se falhar
+    """
     try:
         parsed = json.loads(raw_response.strip())
-        if isinstance(parsed, dict) and field in parsed:
-            value = parsed[field]
-            return str(value).strip() if value else _DEFAULT_PROJECT_TYPE
+        if not isinstance(parsed, dict) or field not in parsed:
+            value = _get_default_for_field(field)
+            logger.warning(
+                f"Campo '{field}' não encontrado em JSON. Usando default: {value}"
+            )
+            return value
+
+        raw_value = parsed[field]
+        if not raw_value:
+            return _get_default_for_field(field)
+
+        # Normalizar via normalize_label
+        normalized = normalize_label(str(raw_value).strip(), field)
+        return normalized
+
+    except (json.JSONDecodeError, TypeError, AttributeError) as e:
+        default = _get_default_for_field(field)
+        logger.warning(
+            f"Erro ao parsear JSON para '{field}': {str(e)[:100]}. Usando default: {default}"
+        )
+        return default
+
+
+def _get_default_for_field(field: str) -> str:
+    """Retorna valor default apropriado para cada campo."""
+    if field == "project_type":
         return _DEFAULT_PROJECT_TYPE
-    except (json.JSONDecodeError, TypeError, AttributeError):
-        logger.warning(f"Falha ao parsear JSON do LLM: {raw_response[:100]}")
-        return _DEFAULT_PROJECT_TYPE
+    elif field == "pr_nature":
+        return _DEFAULT_PR_NATURE
+    elif field == "clarity_level":
+        return _DEFAULT_CLARITY_LEVEL
+    return "other"
 
 
 def _build_analysis_result(
@@ -108,16 +145,9 @@ def _build_analysis_result(
         project_type=project_type,
         pr_nature=pr_nature,
         clarity_level=clarity_level,
-        char_count=compute_char_count(record.body),
-        word_count=compute_word_count(record.body),
+        char_count=calculate_char_count(record.body),
+        word_count=calculate_word_count(record.body),
     )
-
-
-def _extract_field_from_json(response: str, field: str) -> str:
-    """Extrai field específico de resposta JSON do LLM com normalização."""
-    raw_value = _parse_json_response(response, field)
-    # Já ajustado para aceitar apenas um argumento conforme a tua implementação
-    return normalize_label(raw_value)
 
 
 # ---------------------------------------------------------------------------
@@ -128,34 +158,47 @@ def _extract_field_from_json(response: str, field: str) -> str:
 def classify_project_type(
     records: Iterable[PRRecord],
 ) -> Generator[AnalysisResult, None, None]:
-    """Classifica tipo de projeto para PRs agrupados por repositório."""
-    # Converte para tuple para permitir groupby
-    records_tuple = tuple(records)
+    """Classifica tipo de projeto para PRs agrupados por repositório.
 
-    # Agrupa por repositório (chave funcional)
-    sorted_records = sorted(records_tuple, key=attrgetter("repo"))
-    grouped = groupby(sorted_records, key=attrgetter("repo"))
+    Estratégia: agrupa PRs por repo, faz uma chamada LLM por repo (não por PR),
+    cache em dois níveis (memória + disco), retorna AnalysisResult via lazy generator.
 
-    # Processa cada grupo de repositório
-    for repo, repo_records_iter in grouped:
-        repo_records = tuple(repo_records_iter)
+    Args:
+        records: Stream lazy de PRRecord
 
-        # Cache key: hash do repositório (mesmo para todos PRs do repo)
+    Yields:
+        AnalysisResult com project_type classificado
+    """
+    from core.aggregations.grouping import group_by
+
+    def get_repo(record: PRRecord) -> str:
+        return record.repo
+
+    # Agrupar por repo (materializando apenas por repo, não todo dataset)
+    repo_groups = group_by(get_repo, records)
+
+    for repo, repo_records in repo_groups.items():
+        # repo_records já é tupla de group_by
+        if not repo_records:
+            continue
+
         cache_key = hash_record(repo_records[0])
 
-        # Closure com late-binding fixado
         def _llm_to_analysis_results(rcs=repo_records):
-            """Closure: chama LLM e retorna uma tupla materializada de AnalysisResult."""
+            """Closure: chama LLM e retorna tupla materializada de AnalysisResult."""
             raw_response = classify_project_type_batch(rcs)
             project_type = _extract_field_from_json(raw_response, "project_type")
 
-            # FIX DO BUG: Retorna uma tupla (imutável) em vez de usar yield!
             return tuple(
                 _build_analysis_result(
                     record=record,
                     project_type=project_type,
-                    pr_nature=_DEFAULT_PR_NATURE,
-                    clarity_level=_DEFAULT_CLARITY_LEVEL,
+                    pr_nature=_extract_field_from_json(
+                        classify_pr_nature_single(record), "pr_nature"
+                    ),
+                    clarity_level=_extract_field_from_json(
+                        classify_clarity_single(record), "clarity_level"
+                    ),
                 )
                 for record in rcs
             )

@@ -51,9 +51,7 @@ def by_pr_nature(pr_natures: tuple[str, ...]) -> Predicate:
 
     Os valores devem corresponder ao campo pr_nature definido em AnalysisResult,
     como "bug_fix", "feature", "refactoring", "documentation" e "other".
-
-
-def by_pr_nature(pr_natures: tuple[str, ...]) -> Predicate:
+    """
     allowed = frozenset(map(str.lower, pr_natures))
     return lambda record: record.pr_nature.lower() in allowed
 
@@ -73,8 +71,7 @@ def is_in_date_range(
     end_date: str,
 ) -> Predicate:
     """
-    Cria predicado para filtrar registros
-    dentro de um intervalo de datas.
+    Cria predicado para filtrar registros dentro de um intervalo de datas.
 
     Args:
         start_date:
@@ -84,33 +81,25 @@ def is_in_date_range(
             Data final no formato YYYY-MM-DD.
 
     Returns:
-        Predicate que valida se o registro
-        está dentro do intervalo informado.
+        Predicate que valida se o registro está dentro do intervalo informado.
     """
 
-    return lambda record: start_date <= record.created_at <= end_date
+    return lambda record: (
+        getattr(
+            record,
+            "created_at",
+            None,
+        )
+        is not None
+        and start_date <= record.created_at <= end_date
+    )
 
 
 def compose_predicates(predicates: Iterable[Predicate]) -> Predicate:
     """
-    Constrói uma nova função pura combinando múltiplos predicados via conjunção lógica (AND).
-
-
-def is_in_date_range(
-    start_date: str,
-    end_date: str,
-) -> Predicate:
+    Constrói uma nova função pura combinando múltiplos predicados
+    via conjunção lógica (AND).
     """
-    Cria predicado para filtrar registros dentro de um intervalo de datas.
-
-    Args:
-        start_date: Data inicial no formato YYYY-MM-DD.
-        end_date: Data final no formato YYYY-MM-DD.
-    """
-    return lambda record: start_date <= record.created_at <= end_date
-
-
-def compose_predicates(predicates: Iterable[Predicate]) -> Predicate:
     predicate_tuple: tuple[Predicate, ...] = tuple(predicates)
 
     if not predicate_tuple:

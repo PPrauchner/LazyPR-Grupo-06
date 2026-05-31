@@ -24,6 +24,7 @@ Relacionado a:
     - Issue 09 (exportação em CSV e JSON)
     - HU 09 (exportar resultados para uso em outras ferramentas)
 """
+
 import csv
 import io
 import json
@@ -31,12 +32,31 @@ import os
 from typing import Iterable, TextIO
 from core.models.analysis_result import AnalysisResult
 
-
 CSV_FIELDNAMES = [
-    "id", "repo", "path", "author", "author_association", "body",
-    "diff_hunk", "language", "char_count", "word_count", "project_type",
-    "pr_nature", "clarity_level", "html_url", "commit_id", "line", "created_at",
+    "id",
+    "repo",
+    "path",
+    "author",
+    "author_association",
+    "body",
+    "diff_hunk",
+    "language",
+    "char_count",
+    "word_count",
+    "project_type",
+    "pr_nature",
+    "clarity_level",
+    "html_url",
+    "commit_id",
+    "line",
+    "created_at",
 ]
+
+
+def enrich_records(
+    records,
+):
+    return records
 
 
 def _analysis_result_to_dict(result: AnalysisResult) -> dict:

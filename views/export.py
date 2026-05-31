@@ -1,5 +1,5 @@
 """
-pages/export.py
+views/export.py
 ==================
 Camada de apresentação final para exportação dos resultados enriquecidos.
 
@@ -27,51 +27,66 @@ from ui.components import data_table, download_buttons, metric_card, status_bann
 st.set_page_config(page_title="LazyPR - Exportar", page_icon="💾")
 
 
-def render() -> None:
-    """Orquestra a renderização da página de exportação.
+def render_export_page(records):
 
-    Lê os resultados de `st.session_state["results"]`, materializa em tupla
-    imutável para permitir múltiplos consumos (KPIs, tabela e download), e
-    delega cada seção ao componente correspondente de `ui/components.py`.
+    if not records:
+        st.warning("Nenhum resultado disponível.")
+        return
 
-    Interrompe a execução com `st.stop()` quando nenhum dado processado
-    estiver disponível na sessão, orientando o usuário ao fluxo correto.
 
-    Returns:
-        None: Função de efeito colateral — renderiza no Streamlit.
+def render_export_page(records=None) -> None:
     """
+    Renderiza a página de exportação.
+    """
+
     st.title("💾 Exportar Resultados")
 
-    if "results" not in st.session_state or not st.session_state["results"]:
+    if "analysis_results" not in st.session_state:
+
         status_banner(
             "Nenhum dado processado disponível. "
             "Por favor, retorne à página de Upload e inicie uma análise.",
             status_type="warning",
         )
+
         st.stop()
         return
 
-    results = tuple(st.session_state["results"])
+    results = tuple(st.session_state["analysis_results"])
 
     st.subheader("Resumo do Arquivo")
+
     col1, col2, _ = st.columns(3)
 
     with col1:
-        metric_card("Total de PRs", len(results))
+        metric_card(
+            "Total de PRs",
+            len(results),
+        )
 
     with col2:
-        clarity_counts = count_by(results, lambda r: r.clarity_level)
-        metric_card("Clareza Alta", clarity_counts.get("excellent", 0))
+
+        clarity_counts = count_by(
+            results,
+            lambda r: r.clarity_level,
+        )
+
+        metric_card(
+            "Clareza Alta",
+            clarity_counts.get(
+                "excellent",
+                0,
+            ),
+        )
 
     st.divider()
 
     st.subheader("Prévia dos Dados")
+
     data_table(results)
 
     st.divider()
 
     st.subheader("Opções de Download")
+
     download_buttons(results)
-
-
-render()

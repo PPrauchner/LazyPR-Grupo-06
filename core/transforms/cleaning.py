@@ -297,10 +297,20 @@ def clean_pr_record(record: PRRecord) -> PRRecord:
         created_at=clean_optional_text(record.created_at),
     )
 
-REQUIRED_COLUMNS: frozenset[str] = frozenset({
-    "id", "html_url", "path", "body", "diff_hunk", "user", 
-    "author_association", "commit_id", "line",
-})
+
+REQUIRED_COLUMNS: frozenset[str] = frozenset(
+    {
+        "id",
+        "html_url",
+        "path",
+        "body",
+        "user",
+        "author_association",
+        "commit_id",
+        "line",
+    }
+)
+
 
 def get_missing_columns(header: _Iterable[str]) -> tuple[str, ...]:
     """
@@ -308,15 +318,15 @@ def get_missing_columns(header: _Iterable[str]) -> tuple[str, ...]:
 
     A função utiliza teoria de conjuntos para comparar as colunas fornecidas
     com o conjunto restrito de colunas exigidas (`REQUIRED_COLUMNS`). É uma
-    função pura que higieniza os espaços em branco do cabeçalho de entrada 
+    função pura que higieniza os espaços em branco do cabeçalho de entrada
     sem causar mutação nos dados originais.
 
     Args:
         header: Iterável contendo os nomes das colunas lidos do arquivo.
 
     Returns:
-        Tupla ordenada alfabeticamente contendo os nomes das colunas 
-        obrigatórias que não foram encontradas. Retorna uma tupla vazia 
+        Tupla ordenada alfabeticamente contendo os nomes das colunas
+        obrigatórias que não foram encontradas. Retorna uma tupla vazia
         se o schema estiver perfeitamente válido.
     """
     header_set = frozenset(col.strip() for col in header)

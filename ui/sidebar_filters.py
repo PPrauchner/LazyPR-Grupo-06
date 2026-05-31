@@ -15,6 +15,8 @@ Não deve:
 """
 
 import streamlit as st
+from datetime import date
+
 from ui.layout import (
     render_section_title,
     render_dataset_card,
@@ -70,11 +72,17 @@ PAGES = (
 
 
 def get_active_filters() -> Predicate:
-    """
-    Retorna predicado funcional composto
-    baseado nos filtros ativos.
-    """
+    """Retorna predicado funcional composto baseado nos filtros ativos.
 
+    Lógica: (language1 OR language2 OR ...) AND (type1 OR type2 OR ...) AND ...
+
+    Cada dimensão tem OR interno (múltiplas seleções na mesma dimensão = OR).
+    Entre dimensões: AND (todos os filtros ativos devem ser satisfeitos).
+
+    Returns:
+        Predicate (Callable[[AnalysisResult], bool]) que retorna True se o registro
+        satisfaz todos os critérios ativos.
+    """
     active_predicates = []
 
     selected_languages = st.session_state.get(
@@ -110,36 +118,20 @@ def get_active_filters() -> Predicate:
         "end_date",
     )
 
-    active_predicates.extend(
-        map(
-            lambda language: by_language((language,)),
-            selected_languages,
-        )
-    )
+    # UM predicado por dimensão (OR dentro de cada uma)
+    if selected_languages:
+        active_predicates.append(by_language(selected_languages))
 
-    active_predicates.extend(
-        map(
-            lambda project_type: by_project_type((project_type,)),
-            selected_project_types,
-        )
-    )
+    if selected_project_types:
+        active_predicates.append(by_project_type(selected_project_types))
 
-    active_predicates.extend(
-        map(
-            lambda pr_nature: by_pr_nature((pr_nature,)),
-            selected_natures,
-        )
-    )
+    if selected_natures:
+        active_predicates.append(by_pr_nature(selected_natures))
 
-    active_predicates.extend(
-        map(
-            lambda clarity: by_clarity_level((clarity,)),
-            selected_clarity,
-        )
-    )
+    if selected_clarity:
+        active_predicates.append(by_clarity_level(selected_clarity))
 
     if use_date_filter and start_date and end_date:
-
         active_predicates.append(
             is_in_date_range(
                 start_date,
@@ -159,57 +151,64 @@ def render_sidebar() -> dict:
 
     with st.sidebar:
 
-        if "dark_mode" not in st.session_state:
+        if "theme_mode" not in st.session_state:
 
-            st.session_state["dark_mode"] = True
+            st.session_state["theme_mode"] = "dark"
 
-        theme_toggle = st.toggle(
+        theme_is_dark = st.session_state["theme_mode"] == "dark"
+
+        toggle_value = st.toggle(
             "🌙 Tema Escuro",
-            key="dark_mode",
+            value=theme_is_dark,
         )
 
-        st.caption("Alternar aparência visual do dashboard.")
+        st.session_state["theme_mode"] = "dark" if toggle_value else "light"
 
-        st.session_state["theme_mode"] = "dark" if theme_toggle else "light"
+        st.caption("Alternar aparência visual do dashboard.")
 
         st.title("🚀 LazyPR")
 
         st.markdown("""
-          Análise semântica de Pull Requests
-          com Programação Funcional e LLMs.
-          """)
+            Plataforma para análise semântica de Pull Requests com LLMs.
+            """)
 
         st.divider()
 
         render_section_title("NAVEGAÇÃO")
 
+        if "page" not in st.session_state:
+            st.session_state["page_override"] = "🏠 Home"
+
         selected_page = st.radio(
             "Navegação",
             PAGES,
+            key="page",
             label_visibility="collapsed",
         )
 
+        st.divider()
+
         render_section_title("FILTROS GLOBAIS")
 
-        selected_languages = st.multiselect(
+        st.multiselect(
             "Linguagens",
             LANGUAGES,
             key="selected_languages",
         )
 
-        selected_project_types = st.multiselect(
+        st.multiselect(
             "Tipos de Projeto",
             PROJECT_TYPES,
             key="selected_project_types",
         )
 
-        selected_natures = st.multiselect(
+        st.multiselect(
             "Natureza da Contribuição",
             PR_NATURES,
             key="selected_natures",
         )
 
-        selected_clarity = st.multiselect(
+        st.multiselect(
             "Nível de Clareza",
             CLARITY_LEVELS,
             key="selected_clarity",
@@ -222,24 +221,54 @@ def render_sidebar() -> dict:
 
         if use_date_filter:
 
-            dates = st.date_input(
-                "Intervalo de criação",
-                key="date_range",
+            st.markdown("##### Período")
+
+            start_date = st.date_input(
+                "Data inicial",
+                value=date(2020, 1, 1),
+                key="start_date_input",
             )
 
-            if len(dates) == 2:
+            end_date = st.date_input(
+                "Data final",
+                value=date.today(),
+                key="end_date_input",
+            )
 
-                st.session_state["start_date"] = dates[0].strftime("%Y-%m-%d")
+            st.session_state["start_date"] = start_date.strftime("%Y-%m-%d")
 
-                st.session_state["end_date"] = dates[1].strftime("%Y-%m-%d")
+            st.session_state["end_date"] = end_date.strftime("%Y-%m-%d")
 
         st.divider()
 
-        st.caption("Projeto desenvolvido com " "Programação Funcional.")
+        if st.button(
+            "↻ Limpar filtros",
+            width="stretch",
+        ):
+
+            keys_to_clear = (
+                "selected_languages",
+                "selected_project_types",
+                "selected_natures",
+                "selected_clarity",
+                "use_date_filter",
+                "start_date",
+                "end_date",
+                "start_date_input",
+                "end_date_input",
+            )
+
+            for key in keys_to_clear:
+
+                if key in st.session_state:
+
+                    del st.session_state[key]
+
+            st.rerun()
 
         dataset_name = st.session_state.get(
             "dataset_name",
-            "Nenhum dataset",
+            "Nenhum dataset carregado",
         )
 
         analysis_results = st.session_state.get(
@@ -252,6 +281,10 @@ def render_sidebar() -> dict:
             len(tuple(analysis_results)),
         )
 
+        st.divider()
+
+        st.caption("LazyPR • 2026")
+
     return {
-        "page": selected_page,
+        "page": st.session_state["page"],
     }

@@ -32,6 +32,7 @@ Relacionado a:
     - Conceito-Chave 01 (lazy evaluation via geradores)
     - Dica 01 (módulos csv/json com geradores linha a linha)
 """
+
 import csv
 import json
 import hashlib
@@ -146,8 +147,7 @@ def read_header_lazily(file_target: Union[str, BinaryIO]) -> tuple[str, ...]:
 
 
 def stream_csv(
-    file_target: Union[str, BinaryIO], 
-    hasher: Any = None
+    file_target: Union[str, BinaryIO], hasher: Any = None
 ) -> Iterator[PRRecord]:
     """
     Itera sobre um arquivo CSV de forma lazy produzindo instâncias de PRRecord.
@@ -168,20 +168,20 @@ def stream_csv(
         hasher = hashlib.sha256()
 
     with _get_file_buffer(file_target) as file_buffer:
+
         def lazy_decoder_and_hasher() -> Iterator[str]:
             for line_bytes in file_buffer:
                 hasher.update(line_bytes)
                 yield line_bytes.decode("utf-8", errors="replace")
 
         reader = csv.DictReader(lazy_decoder_and_hasher())
-        
+
         for row in reader:
             yield _map_csv_row(row)
 
 
 def stream_json(
-    file_target: Union[str, BinaryIO], 
-    hasher: Any = None
+    file_target: Union[str, BinaryIO], hasher: Any = None
 ) -> Iterator[PRRecord]:
     """
     Itera sobre um arquivo JSON Lines de forma lazy produzindo PRRecords.
@@ -204,9 +204,29 @@ def stream_json(
     with _get_file_buffer(file_target) as file_buffer:
         for line_bytes in file_buffer:
             hasher.update(line_bytes)
-            
+
             if not line_bytes.strip():
                 continue
-                
+
             row_data = json.loads(line_bytes.decode("utf-8", errors="replace"))
             yield _map_csv_row(row_data)
+
+
+def ingest_dataset(
+    uploaded_file,
+):
+    """
+    Executa pipeline principal de ingestão, retornando gerador lazy.
+    """
+
+    filename = uploaded_file.name.lower()
+
+    if filename.endswith(".csv"):
+        return stream_csv(uploaded_file)
+
+    elif filename.endswith(".json"):
+        return stream_json(uploaded_file)
+
+    else:
+
+        raise ValueError("Formato de arquivo não suportado.")

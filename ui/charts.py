@@ -1,7 +1,4 @@
 """
-ui/charts.py
-=============
-
 Funções puras de visualização para gráficos interativos
 utilizados no dashboard do projeto.
 
@@ -90,6 +87,29 @@ def apply_default_layout(
         font={
             "color": theme["text"],
         },
+        margin=dict(
+            l=0,
+            r=0,
+            t=40,
+            b=0,
+        ),
+        hoverlabel=dict(
+            bgcolor=theme["card"],
+            bordercolor=theme["border"],
+            font_size=13,
+        ),
+    )
+
+    figure.update_xaxes(
+        showgrid=True,
+        gridcolor="rgba(128,128,128,0.10)",
+        zeroline=False,
+    )
+
+    figure.update_yaxes(
+        showgrid=True,
+        gridcolor="rgba(128,128,128,0.10)",
+        zeroline=False,
     )
 
     return figure

@@ -60,3 +60,33 @@ div[role="radiogroup"] label[data-baseweb="radio"] {
 .stDateInput input {
   border-radius: 10px;
 }
+
+/* Hero Section */
+
+h1,
+h2,
+h3,
+h4 {
+  color: #0f172a !important;
+}
+
+p {
+  color: #334155 !important;
+}
+
+/* Texto do Hero */
+
+.hero-title {
+  color: #0f172a !important;
+}
+
+.hero-subtitle {
+  color: #334155 !important;
+}
+
+/* Cards */
+
+[data-testid="stMetric"] {
+  border: 1px solid #dbe4ee !important;
+  background: #ffffff !important;
+}

@@ -30,6 +30,7 @@ Relacionado a:
     - Regra Funcional 01 (reduce() para cálculos de agregação)
     - Conceito-Chave 03 (reduce para agregação)
 """
+
 from functools import reduce
 from typing import Iterable
 
@@ -253,3 +254,65 @@ def clarity_distribution(records: Iterable[AnalysisResult]) -> dict[str, int]:
 
     initial = {"insufficient": 0, "basic": 0, "good": 0, "excellent": 0}
     return reduce(accumulator, records, initial)
+
+
+def correlation_summary(
+    groups: dict[tuple, tuple[AnalysisResult, ...]],
+) -> dict[tuple, dict[str, float]]:
+    """Computa proporção de cada clarity_level por grupo (para análise de correlação).
+
+    Dado agrupamentos compostos (ex: (language, project_type) → registros),
+    calcula a distribuição de clarity_level dentro de cada grupo,
+    retornando frações (0.0 a 1.0) para cada nível.
+
+    Implementado via reduce() conforme Regra Funcional 01.
+
+    Args:
+        groups: Dict[tuple, tuple[AnalysisResult, ...]] produzido por grouping.group_by()
+
+    Returns:
+        Dict[tuple, Dict[str, float]] mapeando cada chave de grupo
+        → {clarity_level: proporção}
+
+    Exemplo:
+        >>> groups = {("Python", "library"): (pr1, pr2, pr3), ...}
+        >>> correlation_summary(groups)
+        {
+            ("Python", "library"): {"good": 0.67, "excellent": 0.33, "insufficient": 0.0, "basic": 0.0},
+            ...
+        }
+    """
+
+    def count_clarity_in_group(
+        group_key: tuple, records: tuple[AnalysisResult, ...]
+    ) -> tuple[tuple, dict[str, float]]:
+        """Conta ocorrências de cada clarity_level no grupo e converte para proporções."""
+
+        def reducer(acc: dict, record: AnalysisResult) -> dict:
+            clarity = record.clarity_level
+            return acc | {clarity: acc.get(clarity, 0) + 1}
+
+        # Contar via reduce (sem mutar)
+        counts = reduce(reducer, records, {})
+
+        # Converter para proporções
+        total = len(records) if records else 1
+        proportions = {
+            clarity: round(count / total, 4) for clarity, count in counts.items()
+        }
+
+        # Garantir que todos os níveis estão presentes (mesmo com 0)
+        all_levels = {"insufficient", "basic", "good", "excellent"}
+        proportions_normalized = {
+            level: proportions.get(level, 0.0) for level in all_levels
+        }
+
+        return (group_key, proportions_normalized)
+
+    # Aplicar count_clarity_in_group a cada grupo e converter para dict
+    result_tuples = tuple(
+        count_clarity_in_group(group_key, records)
+        for group_key, records in groups.items()
+    )
+
+    return dict(result_tuples)

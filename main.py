@@ -17,8 +17,9 @@ Não deve:
 """
 
 import streamlit as st
-from ui.theme import (
-    apply_theme,
+
+from views.home import (
+    render_home,
 )
 
 from views.overview import (
@@ -47,9 +48,20 @@ st.set_page_config(
     layout="wide",
 )
 
-if "theme_mode" not in st.session_state:
+from ui.theme import (
+    apply_theme,
+    initialize_theme,
+)
 
-    st.session_state["theme_mode"] = "dark"
+from views.cleaning_dashboard import (
+    render_cleaning_dashboard,
+)
+
+from views.normalization_dashboard import (
+    render_normalization_dashboard,
+)
+
+initialize_theme()
 
 apply_theme()
 
@@ -60,9 +72,19 @@ records = st.session_state.get(
 
 filters = render_sidebar()
 
-page = filters["page"]
+if "page_override" in st.session_state:
 
-if page == "📂 Upload":
+ page = st.session_state.pop(
+        "page_override"
+    )
+else:   
+   page = filters["page"]
+   
+if page == "🏠 Home":
+
+    render_home(records)
+
+elif page == "📂 Upload":
 
     render_upload_page()
 
@@ -77,3 +99,10 @@ elif page == "🔥 Correlação":
 elif page == "💾 Exportação":
 
     render_export_page(records)
+elif page == "🧹 Limpeza":
+
+    render_cleaning_dashboard(records)
+
+elif page == "⚙️ Normalização":
+
+    render_normalization_dashboard(records)

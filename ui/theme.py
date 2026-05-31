@@ -1,78 +1,95 @@
 """
-Sistema global de temas do LazyPR.
-
-Responsabilidades:
-    - Centralizar paletas visuais
-    - Aplicar CSS global
-    - Gerenciar dark/light mode
-    - Fornecer configurações visuais reutilizáveis
+Gerenciamento global de tema visual do LazyPR.
 """
-
-from pathlib import Path
 
 import streamlit as st
 
-DARK_THEME = {
-    "mode": "dark",
-    "background": "#0B1120",
-    "card": "#121A2B",
-    "text": "#F3F4F6",
-    "sidebar_text": "#F3F4F6",
-    "muted_text": "#9CA3AF",
-    "primary": "#7C3AED",
-    "secondary": "#06B6D4",
-    "border": "#1F2937",
-    "success": "#10B981",
-    "warning": "#F59E0B",
-    "error": "#EF4444",
-    "plotly_template": "plotly_dark",
+THEMES = {
+    "dark": {
+        "background": "#020817",
+        "card": "#111827",
+        "border": "#334155",
+        "text": "#f8fafc",
+        "muted_text": "#cbd5e1",
+        "success": "#22c55e",
+        "error": "#ef4444",
+        "plotly_template": "plotly_dark",
+    },
+    "light": {
+        "background": "#f8fafc",
+        "card": "#ffffff",
+        "border": "#dbe4ee",
+        "text": "#0f172a",
+        "muted_text": "#475569",
+        "success": "#16a34a",
+        "error": "#dc2626",
+        "plotly_template": "plotly_white",
+    },
 }
 
 
-LIGHT_THEME = {
-    "mode": "light",
-    "background": "#F8FAFC",
-    "card": "#FFFFFF",
-    "text": "#111827",
-    "sidebar_text": "#111827",
-    "muted_text": "#6B7280",
-    "primary": "#7C3AED",
-    "secondary": "#0891B2",
-    "border": "#E5E7EB",
-    "success": "#10B981",
-    "warning": "#F59E0B",
-    "error": "#EF4444",
-    "plotly_template": "plotly_white",
-}
-
-
-def get_theme() -> dict:
+def initialize_theme() -> None:
     """
-    Retorna tema atualmente ativo.
+    Inicializa tema global da aplicação.
     """
 
-    theme_mode = st.session_state.get(
+    if "theme_mode" not in st.session_state:
+
+        st.session_state["theme_mode"] = "dark"
+
+
+def set_theme(
+    mode: str,
+) -> None:
+    """
+    Atualiza tema ativo.
+    """
+
+    if mode not in THEMES:
+
+        return
+
+    st.session_state["theme_mode"] = mode
+
+
+def get_theme_mode() -> str:
+    """
+    Retorna tema ativo.
+    """
+
+    return st.session_state.get(
         "theme_mode",
         "dark",
     )
 
-    return DARK_THEME if theme_mode == "dark" else LIGHT_THEME
+
+def get_theme() -> dict:
+    """
+    Retorna tokens do tema ativo.
+    """
+
+    return THEMES[get_theme_mode()]
 
 
 def apply_theme() -> None:
     """
-    Aplica CSS global do tema ativo.
+    Aplica CSS do tema ativo.
     """
 
-    theme = get_theme()
+    theme_mode = get_theme_mode()
 
-    css_file = "dark.css" if theme["mode"] == "dark" else "light.css"
+    css_path = "ui/styles/dark.css" if theme_mode == "dark" else "ui/styles/light.css"
 
-    css_path = Path(__file__).parent / "styles" / css_file
-
-    with open(css_path, encoding="utf-8") as file:
+    with open(
+        css_path,
+        encoding="utf-8",
+    ) as css_file:
 
         st.markdown(
-            f"<style>{file.read()}</style>",
+            f"""
+            <style>
+            {css_file.read()}
+            </style>
+            """,
             unsafe_allow_html=True,
         )

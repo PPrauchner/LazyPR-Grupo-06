@@ -1,10 +1,10 @@
 import pytest
 from unittest.mock import MagicMock, patch
-from pages.upload import _validate_schema
+from views.upload import _validate_schema
 
-@patch("pages.upload.st")
-@patch("pages.upload.get_missing_columns")
-@patch("pages.upload.read_header_lazily")
+@patch("views.upload.st")
+@patch("views.upload.get_missing_columns")
+@patch("views.upload.read_header_lazily")
 def test_validate_schema_with_missing_columns(mock_read_header, mock_get_missing, mock_st):
     """
     Verifica se a validação falha e aciona o erro no Streamlit 
@@ -26,9 +26,9 @@ def test_validate_schema_with_missing_columns(mock_read_header, mock_get_missing
     # Verifica se a sua lógica de rebobinar o ponteiro do arquivo foi chamada
     mock_file.seek.assert_called_with(0)
 
-@patch("pages.upload.st")
-@patch("pages.upload.get_missing_columns")
-@patch("pages.upload.read_header_lazily")
+@patch("views.upload.st")
+@patch("views.upload.get_missing_columns")
+@patch("views.upload.read_header_lazily")
 def test_validate_schema_success(mock_read_header, mock_get_missing, mock_st):
     """
     Verifica se o schema passa corretamente e não emite erros

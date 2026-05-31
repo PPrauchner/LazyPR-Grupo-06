@@ -17,26 +17,31 @@
 ## 2. Princípios de Codificação (Mandatórios)
 
 ### Paradigma Funcional Estrito
+
 - **Proibido** o uso de `for` ou `while` como mecanismo principal de transformação de dados.
 - Use exclusivamente `map()`, `filter()`, `reduce()`, compreensões de lista/geradores e recursão.
 - Laços são permitidos **somente** em código de I/O na camada `services/`, mediante justificativa em comentário.
 
 ### Imutabilidade
+
 - Modelos de domínio devem ser `NamedTuple` ou `dataclass(frozen=True)`.
 - **Proibido** o uso de `.append()`, `.update()`, `.extend()` ou qualquer método que altere estruturas in-place.
 - Ao transformar dados, sempre retorne uma nova instância — nunca modifique a original.
 - Prefira `tuple` a `list` e `frozenset` a `set` quando a coleção não precisar ser modificada.
 
 ### Lazy Evaluation
+
 - Todo processamento de dataset deve usar geradores (`yield`) e expressões geradoras.
 - Use `itertools` para encadeamento e combinação de streams sem materialização.
 - Nenhuma função deve chamar `list()` sobre o stream completo do dataset.
 
 ### Pureza de Funções
+
 - Toda função dentro de `core/` deve ser pura: mesma entrada → mesma saída, sem I/O, sem estado global, sem efeitos colaterais.
 - Funções impuras (I/O, rede, LLM, Streamlit) vivem **exclusivamente** em `services/` e `ui/`.
 
 ### Memoização
+
 - Use `functools.lru_cache` para funções puras chamadas repetidamente com mesmas entradas.
 - Para classificações LLM, use `utils/memoization.py` com chave SHA-256 do conteúdo via `utils/hashing.py`.
 - O cache deve ser persistido em disco via `services/storage.py` para sobreviver entre sessões.
@@ -63,6 +68,7 @@ O dataset contém comentários de PRs, **não** os PRs completos. O schema real 
 ```
 
 **Campos ausentes no dataset** que devem ser derivados:
+
 - `repo` — extraído da `html_url` (ex: `"golang/go"`)
 - `language` — inferido pelo LLM a partir de `path` e `diff_hunk`
 - `title` e `created_at` — ausentes; tratar como `None` ou omitir do modelo
@@ -72,6 +78,7 @@ O dataset contém comentários de PRs, **não** os PRs completos. O schema real 
 ## 4. Modelos de Domínio
 
 ### `core/models/pr_record.py` — registro bruto
+
 ```python
 class PRRecord(NamedTuple):
     id:                 int
@@ -89,6 +96,7 @@ class PRRecord(NamedTuple):
 ```
 
 ### `core/models/analysis_result.py` — registro enriquecido
+
 ```python
 class AnalysisResult(NamedTuple):
     # Todos os campos de PRRecord, mais:
@@ -133,7 +141,7 @@ LAZYPR-GRUPO-06/
 │   ├── charts.py             # Funções de plotagem (recebem dados agregados)
 │   └── sidebar_filters.py    # Controles → get_active_filters() → predicado composto
 │
-├── pages/
+├── views/
 │   ├── 1_upload.py
 │   ├── 2_overview.py
 │   ├── 3_correlation.py
@@ -154,6 +162,7 @@ LAZYPR-GRUPO-06/
 ## 6. Regras por Camada
 
 ### `core/` — Functional Core
+
 - ✅ `map()`, `filter()`, `reduce()`, `functools`, `itertools`
 - ✅ Funções que recebem e retornam `NamedTuple`
 - ✅ `lru_cache` em funções puras chamadas repetidamente
@@ -161,6 +170,7 @@ LAZYPR-GRUPO-06/
 - ❌ Qualquer acesso a variável global ou estado externo
 
 ### `services/` — Imperative Shell
+
 - ✅ I/O de arquivo, requisições HTTP, chamadas ao Agno/Groq
 - ✅ `try/except` para tratamento de falhas de rede e parsing
 - ✅ Atomic writes para persistência de cache (escrever em `.tmp`, renomear)
@@ -169,6 +179,7 @@ LAZYPR-GRUPO-06/
 - ❌ Lógica de plotagem ou componentes Streamlit
 
 ### `ui/` — Interface
+
 - ✅ Componentes Streamlit, `st.session_state`
 - ✅ Chamar funções de `core/aggregations/` para obter dados agregados
 - ✅ Chamar funções de `ui/charts.py` passando dados prontos
@@ -190,24 +201,26 @@ LAZYPR-GRUPO-06/
 
 Os prompts devem instruir o modelo a retornar **estritamente** um dos valores abaixo. Qualquer outro valor deve ser normalizado por `core/transforms/normalizing.py`.
 
-| Classificação | Valores válidos |
-|---|---|
-| `project_type` | `"library"`, `"web_app"`, `"framework"`, `"cli"`, `"other"` |
-| `pr_nature` | `"bug_fix"`, `"feature"`, `"refactoring"`, `"documentation"`, `"other"` |
-| `clarity_level` | `"insufficient"`, `"basic"`, `"good"`, `"excellent"` |
+| Classificação   | Valores válidos                                                         |
+| --------------- | ----------------------------------------------------------------------- |
+| `project_type`  | `"library"`, `"web_app"`, `"framework"`, `"cli"`, `"other"`             |
+| `pr_nature`     | `"bug_fix"`, `"feature"`, `"refactoring"`, `"documentation"`, `"other"` |
+| `clarity_level` | `"insufficient"`, `"basic"`, `"good"`, `"excellent"`                    |
 
 O prompt deve sempre incluir a lista de valores válidos e exigir resposta em JSON puro, sem texto livre:
+
 ```json
-{"project_type": "library"}
+{ "project_type": "library" }
 ```
 
 ---
 
 ## 9. Páginas do Streamlit — Responsabilidades e Fluxo de Dados
 
-Cada página em `pages/` deve seguir o padrão: **ler do `st.session_state` → aplicar filtros → chamar aggregations → chamar charts → renderizar**. Nenhuma página deve acessar o dataset bruto diretamente.
+Cada página em `views/` deve seguir o padrão: **ler do `st.session_state` → aplicar filtros → chamar aggregations → chamar charts → renderizar**. Nenhuma página deve acessar o dataset bruto diretamente.
 
-### `pages/1_upload.py` — Upload e Ingestão (Issue 01)
+### `views/1_upload.py` — Upload e Ingestão (Issue 01)
+
 - Renderiza `st.file_uploader` para CSV ou JSON
 - Ao receber arquivo, chama `services/ingestion.py` para obter o hash e o stream de `PRRecord`
 - Verifica via `services/storage.py` se análise já existe para aquele hash
@@ -215,7 +228,8 @@ Cada página em `pages/` deve seguir o padrão: **ler do `st.session_state` → 
 - Se não existir: executa `core/pipeline/runner.py` com todas as etapas habilitadas, exibe barra de progresso, persiste via `storage.py` e salva em `st.session_state["results"]`
 - Ao final, redireciona o usuário para `2_overview.py`
 
-### `pages/2_overview.py` — Dashboard de Volume e Distribuição (Issues 05 e 06)
+### `views/2_overview.py` — Dashboard de Volume e Distribuição (Issues 05 e 06)
+
 - Lê `st.session_state["results"]` e `st.session_state["active_filter"]`
 - Aplica o filtro composto retornado por `ui/sidebar_filters.get_active_filters()`
 - Chama `core/aggregations/counters.count_by_language()`, `count_by_project_type()`, `count_by_pr_nature()` para alimentar os gráficos de barras
@@ -223,14 +237,16 @@ Cada página em `pages/` deve seguir o padrão: **ler do `st.session_state` → 
 - Renderiza via `ui/charts.bar_chart_by_category()` e `ui/charts.distribution_chart()`
 - Exibe `ui/components.metric_card()` com KPIs de alto nível (total de PRs, linguagens únicas, distribuição de clareza)
 
-### `pages/3_correlation.py` — Correlação Multidimensional (Issue 07)
+### `views/3_correlation.py` — Correlação Multidimensional (Issue 07)
+
 - Lê `st.session_state["results"]` com filtros aplicados
 - Chama `core/aggregations/grouping.group_by()` com chave composta `(project_type, language)`
 - Chama `core/aggregations/metrics.correlation_summary()` sobre os grupos
 - Renderiza via `ui/charts.correlation_heatmap()` a relação entre clareza, tipo de projeto e linguagem
 - Permite ao analista identificar padrões de contribuição entre dimensões
 
-### `pages/4_export.py` — Exportação (Issue 09)
+### `views/4_export.py` — Exportação (Issue 09)
+
 - Lê `st.session_state["results"]` com filtros aplicados
 - Exibe prévia dos dados via `ui/components.data_table()`
 - Chama `services/exporters.to_download_bytes(results, fmt="csv")` e `fmt="json"`
@@ -243,11 +259,11 @@ Cada página em `pages/` deve seguir o padrão: **ler do `st.session_state` → 
 
 As funções de `ui/charts.py` nunca recebem registros brutos. Elas recebem **exclusivamente estruturas já agregadas** produzidas por `core/aggregations/`. O Copilot deve respeitar esse contrato ao gerar código de plotagem.
 
-| Função em `charts.py` | Recebe (de `aggregations/`) | Renderiza |
-|---|---|---|
-| `bar_chart_by_category(counts, x, y, color)` | `dict[str, int]` de `counters.py` | Gráfico de barras agrupadas por dimensão |
-| `distribution_chart(stats, dimension)` | `dict` com min/max/média/mediana de `metrics.py` | Histograma ou boxplot de `char_count`/`word_count` |
-| `correlation_heatmap(matrix)` | `dict[tuple, float]` de `metrics.correlation_summary()` | Heatmap de correlação entre clareza e contexto |
+| Função em `charts.py`                        | Recebe (de `aggregations/`)                             | Renderiza                                          |
+| -------------------------------------------- | ------------------------------------------------------- | -------------------------------------------------- |
+| `bar_chart_by_category(counts, x, y, color)` | `dict[str, int]` de `counters.py`                       | Gráfico de barras agrupadas por dimensão           |
+| `distribution_chart(stats, dimension)`       | `dict` com min/max/média/mediana de `metrics.py`        | Histograma ou boxplot de `char_count`/`word_count` |
+| `correlation_heatmap(matrix)`                | `dict[tuple, float]` de `metrics.correlation_summary()` | Heatmap de correlação entre clareza e contexto     |
 
 **Biblioteca de plotagem:** Plotly Express (`plotly.express`). Altair é alternativa aceitável. Nunca usar `matplotlib` diretamente em páginas Streamlit.
 
@@ -258,6 +274,7 @@ As funções de `ui/charts.py` nunca recebem registros brutos. Elas recebem **ex
 O sistema de filtros deve funcionar sem reler o arquivo ou reexecutar as classificações LLM.
 
 ### Fluxo completo:
+
 ```
 Usuário altera filtro na sidebar
         ↓
@@ -269,6 +286,7 @@ Dados filtrados passados para aggregations/ e depois para charts/
 ```
 
 ### Regras de implementação:
+
 - Cada critério de filtro (linguagem, tipo, natureza, clareza) gera um predicado independente via `lambda`
 - `build_filter(*predicates)` compõe todos os predicados ativos por conjunção (`all(p(r) for p in predicates)`)
 - O filtro é aplicado sobre `st.session_state["results"]` a cada rerender — nunca salva subset filtrado no session_state
@@ -280,6 +298,7 @@ Dados filtrados passados para aggregations/ e depois para charts/
 ## 12. Exportação — Schema e Formato (Issue 09)
 
 ### CSV
+
 - Cabeçalho com nomes canônicos em `snake_case`
 - Ordem das colunas: campos de identificação → campos textuais → métricas derivadas → classificações LLM
 
@@ -289,10 +308,12 @@ char_count, word_count, project_type, pr_nature, clarity_level
 ```
 
 ### JSON
+
 - Formato JSON Lines (um objeto por linha) para compatibilidade com pipelines externos
 - Cada linha é um `AnalysisResult` serializado como objeto JSON plano (sem aninhamento)
 
 ### Implementação em `services/exporters.py`:
+
 - `export_csv(results, filepath)` — escreve em disco
 - `export_json(results, filepath)` — escreve em disco
 - `to_download_bytes(results, fmt)` — retorna `bytes` para `st.download_button` sem escrita em disco
@@ -303,6 +324,7 @@ char_count, word_count, project_type, pr_nature, clarity_level
 ## 13. Testes
 
 ### Estratégia geral
+
 - Testar **apenas** funções do `core/` e `utils/` — são puras e não precisam de mocks
 - Funções de `services/` devem ser testadas com fixtures e mocks de I/O/LLM
 - Nunca testar lógica de UI diretamente
@@ -322,12 +344,14 @@ tests/
 ```
 
 ### Padrões obrigatórios:
+
 - Usar `pytest` com fixtures em `conftest.py` para `PRRecord` e `AnalysisResult` de exemplo
 - Mockar chamadas LLM com `unittest.mock.patch` em testes de `classifiers.py`
 - Nomear testes como `test_<função>_<cenário>` — ex: `test_build_filter_with_multiple_predicates`
 - Cobrir casos de borda: body vazio, linguagem `None`, label LLM inválido retornado
 
 ### Exemplo de fixture:
+
 ```python
 # tests/conftest.py
 import pytest
@@ -356,6 +380,7 @@ def sample_pr():
 ## 14. Configuração do Ambiente
 
 ### `.env` (nunca versionar — adicionar ao `.gitignore`)
+
 ```env
 # Provider LLM — escolha um
 GROQ_API_KEY=sua_chave_aqui
@@ -368,10 +393,11 @@ LAZYPR_CACHE_DIR=.cache/analyses
 LAZYPR_MAX_BODY_CHARS=1500
 
 # Modelo a usar via Groq (padrão recomendado)
-LAZYPR_MODEL=llama3-8b-8192
+LAZYPR_MODEL=llama-3.1-8b-instant
 ```
 
 ### `.gitignore` — entradas obrigatórias
+
 ```
 .env
 .cache/
@@ -382,6 +408,7 @@ __pycache__/
 ```
 
 ### `pyproject.toml` — dependências essenciais
+
 ```toml
 [project]
 name = "lazypr"
@@ -405,6 +432,7 @@ dev = [
 ```
 
 ### Inicialização do projeto com `uv`
+
 ```bash
 uv sync              # instala dependências
 uv sync --extra dev  # instala dependências de desenvolvimento

@@ -1,21 +1,12 @@
 """
 Dashboard principal para visualização do volume de contribuições.
 
-Esta página apresenta gráficos interativos construídos com
-Streamlit e Plotly para análise agregada dos pull requests.
-
 Responsabilidades:
     - Exibir volume de PRs por linguagem
     - Exibir volume por tipo de projeto
     - Exibir volume por natureza da contribuição
     - Organizar o dashboard em containers e colunas
     - Consumir exclusivamente dados previamente agregados
-    - Manter separação entre UI e lógica funcional
-
-Não deve:
-    - Realizar agregações diretamente
-    - Modificar o dataset
-    - Implementar regras de negócio
 """
 
 from functools import reduce
@@ -35,15 +26,6 @@ from core.aggregations.counters import (
     count_by_pr_nature,
 )
 
-from ui.charts import (
-    bar_chart_by_category,
-    distribution_chart_from_bins,
-)
-
-from ui.components import (
-    metric_card,
-)
-
 from core.transforms.filtering import (
     apply_filters,
 )
@@ -52,12 +34,30 @@ from ui.sidebar_filters import (
     get_active_filters,
 )
 
+from ui.charts import (
+    bar_chart_by_category,
+    distribution_chart_from_bins,
+)
+
+from ui.components import (
+    metric_card,
+    chart_container_start,
+    chart_container_end,
+)
+
+
+def render_overview(records):
+
+    if not records:
+        st.warning("Nenhum resultado processado disponível.")
+        return
+
 
 def _count_total_records(
     records: Iterable[Any],
 ) -> int:
     """
-    Conta total de registros utilizando reduce().
+    Conta total de registros.
     """
 
     return reduce(
@@ -72,25 +72,21 @@ def render_header() -> None:
     Renderiza cabeçalho principal.
     """
 
-    st.title("Overview Pull Requests")
+    st.title("📊 Overview Pull Requests")
 
-    st.markdown(
-        """
-        Visualização agregada do volume de contribuições
-        classificadas pelo pipeline funcional do projeto.
-        """
-        )
-
-    st.divider()
+    st.markdown("""
+        Visualização agregada das contribuições
+        processadas pela pipeline funcional do LazyPR.
+        """)
 
 
 def render_kpis(
     total_records: int,
-    language_data: dict,
-    project_type_data: dict,
+    language_data: Iterable[Any],
+    project_type_data: Iterable[Any],
 ) -> None:
     """
-    Renderiza KPI cards principais.
+    Renderiza KPI cards.
     """
 
     kpi_col1, kpi_col2, kpi_col3 = st.columns(3)
@@ -100,7 +96,7 @@ def render_kpis(
         metric_card(
             label="Total de PRs",
             value=f"{total_records:,}",
-            delta="+14%",
+            delta="",
             icon="📦",
             trend_direction="up",
         )
@@ -110,7 +106,7 @@ def render_kpis(
         metric_card(
             label="Linguagens",
             value=len(language_data),
-            delta="+6%",
+            delta="",
             icon="💻",
             trend_direction="up",
         )
@@ -120,82 +116,87 @@ def render_kpis(
         metric_card(
             label="Tipos de Projeto",
             value=len(project_type_data),
-            delta="+9%",
+            delta="",
             icon="🧩",
             trend_direction="up",
         )
 
-    st.divider()
-
 
 def render_main_charts(
-    language_data: dict,
-    project_type_data: dict,
-    pr_nature_data: dict,
+    language_data: Iterable[Any],
+    project_type_data: Iterable[Any],
+    pr_nature_data: Iterable[Any],
 ) -> None:
     """
-    Renderiza gráficos principais do dashboard.
+    Renderiza gráficos principais.
     """
 
     col1, col2 = st.columns(2)
 
     with col1:
 
-        with st.container(border=True):
-
-            st.plotly_chart(
-                bar_chart_by_category(
-                    language_data,
-                    title="PRs por Linguagem",
-                    x_title="Linguagem",
-                ),
-                use_container_width=True,
-            )
-
-    with col2:
-
-        with st.container(border=True):
-
-            st.plotly_chart(
-                bar_chart_by_category(
-                    project_type_data,
-                    title="PRs por Tipo de Projeto",
-                    x_title="Tipo de Projeto",
-                ),
-                use_container_width=True,
-            )
-
-    st.write("")
-
-    with st.container(border=True):
+        chart_container_start()
 
         st.plotly_chart(
             bar_chart_by_category(
-                pr_nature_data,
-                title="PRs por Natureza da Contribuição",
-                x_title="Natureza",
+                language_data,
+                title="PRs por Linguagem",
+                x_title="Linguagem",
             ),
             use_container_width=True,
         )
+
+        chart_container_end()
+
+    with col2:
+
+        chart_container_start()
+
+        st.plotly_chart(
+            bar_chart_by_category(
+                project_type_data,
+                title="PRs por Tipo de Projeto",
+                x_title="Tipo de Projeto",
+            ),
+            use_container_width=True,
+        )
+
+        chart_container_end()
+
+    chart_container_start()
+
+    st.plotly_chart(
+        bar_chart_by_category(
+            pr_nature_data,
+            title="PRs por Natureza da Contribuição",
+            x_title="Natureza",
+        ),
+        use_container_width=True,
+    )
+
+    chart_container_end()
 
 
 def render_description_distributions(
     records: Iterable[Any],
 ) -> None:
     """
-    Renderiza distribuições estatísticas
-    de tamanho de descrição.
+    Renderiza métricas descritivas.
     """
 
-    stats = description_stats(records)
+    stats = description_stats(
+        records,
+    )
 
-    char_data = char_distribution(records)
+    char_data = char_distribution(
+        records,
+    )
 
-    word_data = word_distribution(records)
+    word_data = word_distribution(
+        records,
+    )
 
-    st.divider()
-
-    st.subheader("Distribuição de Tamanho de Descrição")
+    st.subheader("Distribuição de Descrições")
 
     metric_col1, metric_col2 = st.columns(2)
 
@@ -204,7 +205,7 @@ def render_description_distributions(
         metric_card(
             label="Média de Caracteres",
             value=round(stats["char"]["mean"]),
-            delta="+11%",
+            delta="",
             icon="✏️",
             trend_direction="up",
         )
@@ -214,7 +215,7 @@ def render_description_distributions(
         metric_card(
             label="Média de Palavras",
             value=round(stats["word"]["mean"]),
-            delta="+8%",
+            delta="",
             icon="📝",
             trend_direction="up",
         )
@@ -223,44 +224,46 @@ def render_description_distributions(
 
     with chart_col1:
 
-        with st.container(border=True):
+        chart_container_start()
 
-            st.plotly_chart(
-                distribution_chart_from_bins(
-                    char_data,
-                    dimension="char_count",
-                ),
-                use_container_width=True,
-            )
+        st.plotly_chart(
+            distribution_chart_from_bins(
+                char_data,
+                dimension="char_count",
+            ),
+            use_container_width=True,
+        )
+
+        chart_container_end()
 
     with chart_col2:
 
-        with st.container(border=True):
+        chart_container_start()
 
-            st.plotly_chart(
-                distribution_chart_from_bins(
-                    word_data,
-                    dimension="word_count",
-                ),
-                use_container_width=True,
-            )
+        st.plotly_chart(
+            distribution_chart_from_bins(
+                word_data,
+                dimension="word_count",
+            ),
+            use_container_width=True,
+        )
+
+        chart_container_end()
 
 
 def render_footer() -> None:
     """
-    Renderiza rodapé do dashboard.
+    Renderiza rodapé.
     """
 
-    st.divider()
-
-    st.caption("RP3 • Functional Dashboard • Streamlit")
+    st.caption("LazyPR Analytics Platform")
 
 
 def render_overview(
     records: Iterable[Any],
 ) -> None:
     """
-    Renderiza dashboard principal de overview.
+    Renderiza dashboard overview.
     """
 
     active_filter = get_active_filters()
@@ -272,13 +275,21 @@ def render_overview(
         )
     )
 
-    language_data = count_by_language(filtered_records)
+    language_data = count_by_language(
+        filtered_records,
+    )
 
-    project_type_data = count_by_project_type(filtered_records)
+    project_type_data = count_by_project_type(
+        filtered_records,
+    )
 
-    pr_nature_data = count_by_pr_nature(filtered_records)
+    pr_nature_data = count_by_pr_nature(
+        filtered_records,
+    )
 
-    total_records = _count_total_records(filtered_records)
+    total_records = _count_total_records(
+        filtered_records,
+    )
 
     render_header()
 

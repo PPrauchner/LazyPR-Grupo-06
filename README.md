@@ -58,7 +58,7 @@ O projeto segue o padrão **Functional Core / Imperative Shell**:
 ```
 ┌─────────────────────────────────────────────────────┐
 │                   Interface (Streamlit)              │
-│              ui/ · pages/ · sidebar_filters          │
+│              ui/ · views/ · sidebar_filters          │
 └───────────────────────┬─────────────────────────────┘
                         │ dados agregados
 ┌───────────────────────▼─────────────────────────────┐
@@ -122,7 +122,7 @@ LAZYPR-GRUPO-06/
 │   ├── charts.py                  # Funções de plotagem (bar, distribution, heatmap)
 │   └── sidebar_filters.py         # Controles de filtro → predicados funcionais
 │
-├── pages/                         # Páginas do Streamlit (roteamento automático)
+├── views/                         # Páginas do Streamlit (roteamento automático)
 │   ├── 1_upload.py                # Tela de upload e ingestão do dataset
 │   ├── 2_overview.py              # Dashboard de volume e distribuição (Issues 05, 06)
 │   ├── 3_correlation.py           # Gráfico de correlação multidimensional (Issue 07)

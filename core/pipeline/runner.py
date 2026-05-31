@@ -35,6 +35,7 @@ from typing import Callable, Iterable, NamedTuple, Generator
 from core.models.pr_record import PRRecord
 from core.models.analysis_result import AnalysisResult
 from core.pipeline.composer import pipe
+from core.transforms.filtering import apply_filters
 
 # ---------------------------------------------------------------------------
 # Métricas de Execução (Imutável)
@@ -145,15 +146,16 @@ def run_pipeline(
         stream = (normalize_pr_record(record) for record in stream)
 
     # Etapa 3: Filtragem (quando habilitada)
-    # Nota: Por enquanto não há filtros padrão; em pages/sidebar_filters.py
-    # há get_active_filters() que constrói predicados via build_filter()
     if config.enable_filtering:
-        # Placeholder: sem filtros padrão
-        # Em produção, seria:
-        # from core.transforms.filtering import build_filter
-        # filter_predicate = build_filter(...)
-        # stream = (r for r in stream if filter_predicate(r))
-        pass
+        from ui.sidebar_filters import get_active_filters
+        from core.transforms.filtering import apply_filters
+
+        predicate = get_active_filters()
+
+        stream = apply_filters(
+            (predicate,),
+            stream,
+        )
 
     # Etapa 4: Classificação (core da Phase 2/3)
     if config.enable_classification:
@@ -180,7 +182,7 @@ def run_pipeline(
                 created_at=record.created_at,
                 project_type="other",
                 pr_nature="other",
-                clarity_level="other",
+                clarity_level="unknown",
                 char_count=len(record.body),
                 word_count=len(record.body.split()),
             )
