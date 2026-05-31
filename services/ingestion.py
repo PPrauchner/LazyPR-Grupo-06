@@ -42,6 +42,47 @@ from urllib.parse import urlparse
 
 from core.models.pr_record import PRRecord
 
+# Mapeamento de extensão de arquivo → linguagem canônica (mesma forma usada por normalize_language)
+_EXTENSION_TO_LANGUAGE: dict[str, str] = {
+    "py":   "python",
+    "js":   "javascript",
+    "ts":   "typescript",
+    "java": "java",
+    "go":   "go",
+    "rb":   "ruby",
+    "php":  "php",
+    "rs":   "rust",
+    "cpp":  "cpp",
+    "cc":   "cpp",
+    "cxx":  "cpp",
+    "c":    "c",
+    "cs":    "csharp",
+    "dart":  "dart",
+    "kt":    "kotlin",
+    "jsx":   "javascript",
+    "tsx":   "typescript",
+    "swift": "swift",
+    "scala": "scala",
+}
+
+
+def _infer_language_from_path(path: str) -> str | None:
+    """Infere linguagem de programação a partir da extensão do arquivo no campo path.
+
+    O dataset do Kaggle não possui coluna 'language'; esta função deriva a linguagem
+    da extensão do arquivo comentado (ex: "src/main.go" → "go").
+
+    Args:
+        path: Caminho do arquivo no repositório (ex: "src/math/rand/rand.go").
+
+    Returns:
+        Linguagem canônica (ex: "go", "python") ou None se extensão desconhecida.
+    """
+    if not path or "." not in path:
+        return None
+    ext = path.rsplit(".", 1)[-1].lower()
+    return _EXTENSION_TO_LANGUAGE.get(ext)
+
 
 @contextmanager
 def _get_file_buffer(file_target: Union[str, BinaryIO]) -> Iterator[BinaryIO]:
@@ -108,7 +149,7 @@ def _map_csv_row(row: dict) -> PRRecord:
         author_association=row.get("author_association", ""),
         commit_id=row.get("commit_id", ""),
         line=int(raw_line) if raw_line else 0,
-        language=row.get("language") or None,
+        language=row.get("language") or _infer_language_from_path(row.get("path", "")) or None,
         created_at=row.get("created_at") or None,
     )
 
@@ -176,8 +217,7 @@ def stream_csv(
 
         reader = csv.DictReader(lazy_decoder_and_hasher())
 
-        for row in reader:
-            yield _map_csv_row(row)
+        yield from map(_map_csv_row, reader)
 
 
 def stream_json(

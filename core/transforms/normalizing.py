@@ -58,8 +58,12 @@ _LANGUAGE_VARIANTS = {
     "rust": frozenset(["rust", "rs"]),
     "cpp": frozenset(["c++", "cpp", "cxx"]),
     "c": frozenset(["c"]),
-    "ruby": frozenset(["ruby", "rb"]),
-    "php": frozenset(["php"]),
+    "ruby":   frozenset(["ruby", "rb"]),
+    "php":    frozenset(["php"]),
+    "dart":   frozenset(["dart"]),
+    "kotlin": frozenset(["kotlin", "kt"]),
+    "swift":  frozenset(["swift"]),
+    "scala":  frozenset(["scala"]),
 }
 
 
@@ -127,8 +131,10 @@ def normalize_label(label: str, field: str) -> str:
         field, _VALID_PROJECT_TYPES
     )  # padrão seguro
 
-    # Retorna label se válido, senão "other"
-    return normalized_label if normalized_label in valid_vocab else "other"
+    # Retorna label se válido; clarity_level inválido usa "unknown" (não existe "other" no seu vocabulário)
+    if normalized_label in valid_vocab:
+        return normalized_label
+    return "unknown" if field == "clarity_level" else "other"
 
 
 def normalize_pr_record(record: PRRecord) -> PRRecord:
