@@ -51,10 +51,9 @@ from core.transforms.normalizing import (
 
 from services.llm_client import (
     classify_project_type_batch,
-    classify_pr_nature_single,
-    classify_clarity_single,
+    classify_pr_nature_and_clarity_single,
 )
-from utils.hashing import hash_record
+from utils.hashing import hash_content
 from utils.memoization import cached_classify
 
 logger = logging.getLogger(__name__)
@@ -174,7 +173,9 @@ def classify_project_type(
     def get_repo(record: PRRecord) -> str:
         return record.repo
 
-    # Agrupar por repo (materializando apenas por repo, não todo dataset)
+    # Agrupa por repo via reduce() sobre o stream completo — materialização necessária porque
+    # groupby lazy (itertools) exige stream pré-ordenado que também materializaria via sorted().
+    # Trade-off documentado: classificação por repo impõe O(n) memória neste ponto do pipeline.
     repo_groups = group_by(get_repo, records)
 
     for repo, repo_records in repo_groups.items():
@@ -182,30 +183,41 @@ def classify_project_type(
         if not repo_records:
             continue
 
-        cache_key = hash_record(repo_records[0])
+        # Cache key inclui repo + IDs ordenados para distinguir batches de datasets distintos
+        batch_ids = "".join(str(r.id) for r in sorted(repo_records, key=lambda r: r.id))
+        cache_key = hash_content(f"{repo_records[0].repo}:{batch_ids}")
 
         def _llm_to_analysis_results(rcs=repo_records):
             """Closure: chama LLM e retorna tupla materializada de AnalysisResult."""
             raw_response = classify_project_type_batch(rcs)
             project_type = _extract_field_from_json(raw_response, "project_type")
 
-            return tuple(
-                _build_analysis_result(
+            def _classify_record(record: PRRecord) -> AnalysisResult:
+                # Uma única chamada LLM por PR para pr_nature + clarity_level (reduz RPM)
+                combined = classify_pr_nature_and_clarity_single(record)
+                return _build_analysis_result(
                     record=record,
                     project_type=project_type,
-                    pr_nature=_extract_field_from_json(
-                        classify_pr_nature_single(record), "pr_nature"
-                    ),
-                    clarity_level=_extract_field_from_json(
-                        classify_clarity_single(record), "clarity_level"
-                    ),
+                    pr_nature=_extract_field_from_json(combined, "pr_nature"),
+                    clarity_level=_extract_field_from_json(combined, "clarity_level"),
                 )
-                for record in rcs
-            )
+
+            return tuple(map(_classify_record, rcs))
+
+        # Lookup por ID para reatribuir language e created_at do PRRecord atual ao resultado do cache
+        records_by_id = {r.id: r for r in repo_records}
 
         # Usa cache (dois níveis) para obter AnalysisResults
         for cached_analysis in cached_classify(_llm_to_analysis_results, cache_key):
-            yield cached_analysis
+            record = records_by_id.get(cached_analysis.id)
+            if record is not None:
+                # language e created_at sempre refletem o dado atual (não o valor congelado no cache)
+                yield cached_analysis._replace(
+                    language=record.language,
+                    created_at=record.created_at,
+                )
+            else:
+                yield cached_analysis
 
 
 def classify_pr_nature(record: PRRecord) -> str:

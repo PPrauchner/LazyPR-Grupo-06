@@ -27,6 +27,7 @@ Relacionado a:
 """
 
 import os
+import re
 import time
 import itertools
 import functools
@@ -49,14 +50,31 @@ from core.models.pr_record import PRRecord
 # Constantes de configuração
 # ---------------------------------------------------------------------------
 
-_MAX_RETRIES: int = 3
-_BACKOFF_FACTOR: float = 0.5
+_MAX_RETRIES: int = 6
+_BACKOFF_FACTOR: float = 2.0
 
 _DEFAULT_MODEL = "llama-3.1-8b-instant"
 
 # ---------------------------------------------------------------------------
 # Helpers privados
 # ---------------------------------------------------------------------------
+
+
+def _parse_retry_after(error_message: str, default: float = 5.0) -> float:
+    """Extrai o tempo de espera sugerido pela API Groq em erros 429.
+
+    O Groq inclui "Please try again in Xs" na mensagem de erro.
+    Adiciona 1s de margem sobre o valor extraído.
+
+    Args:
+        error_message: Texto do erro retornado pela API.
+        default: Tempo de espera padrão quando não encontrado na mensagem.
+
+    Returns:
+        Segundos a aguardar antes da próxima tentativa.
+    """
+    match = re.search(r"try again in (\d+(?:\.\d+)?)s", str(error_message))
+    return float(match.group(1)) + 1.0 if match else default
 
 
 def _build_client(api_key: str | None) -> Groq:
@@ -214,6 +232,8 @@ def _invoke_with_retry(
     # Laço justificado: retry de I/O de rede (services/)
     for attempt in range(max_retries):
         try:
+            # Throttle: Groq free tier limita 30 RPM → 1 req a cada 2s + margem de segurança
+            time.sleep(2.1)
             response = client.chat.completions.create(
                 model=model,
                 messages=[{"role": "user", "content": prompt}],
@@ -227,7 +247,14 @@ def _invoke_with_retry(
         except Exception as exc:
             last_exc = exc
             if attempt < max_retries - 1:
-                time.sleep(backoff * (2**attempt))  # backoff exponencial
+                error_str = str(exc)
+                # Erro 429: respeita o tempo sugerido pelo Groq ("try again in Xs")
+                if "429" in error_str or "rate_limit_exceeded" in error_str:
+                    wait = _parse_retry_after(error_str, default=backoff * (2 ** attempt))
+                else:
+                    wait = backoff * (2 ** attempt)
+                logger.warning(f"Tentativa {attempt + 1} falhou. Aguardando {wait:.1f}s...")
+                time.sleep(wait)
 
     raise ValueError(
         f"LLM falhou após {max_retries} tentativas. " f"Último erro: {last_exc}"
@@ -350,6 +377,46 @@ def classify_clarity_single(record: PRRecord) -> str:
     api_key = os.getenv("GROQ_API_KEY")
     model = "llama-3.1-8b-instant"
     logger.debug(f"Usando modelo LLM: {model} para classify_clarity_single")
+
+    client = _build_client(api_key)
+    return _invoke_with_retry(client=client, model=model, prompt=prompt)
+
+
+def classify_pr_nature_and_clarity_single(record: PRRecord) -> str:
+    """Classifica natureza e clareza de um PR em uma única chamada LLM.
+
+    Substitui as duas chamadas separadas (classify_pr_nature_single +
+    classify_clarity_single) por uma única requisição, reduzindo o consumo
+    de RPM à metade para classificações por PR.
+
+    Args:
+        record: PRRecord a classificar.
+
+    Returns:
+        String JSON bruta com dois campos, ex:
+        '{"pr_nature": "feature", "clarity_level": "good"}'.
+
+    Raises:
+        ValueError: Se a API key não estiver definida ou LLM falhar.
+    """
+    if not record.body or not record.body.strip():
+        return '{"pr_nature": "other", "clarity_level": "insufficient"}'
+
+    prompt = (
+        "You are an AI assistant classifying a GitHub Pull Request.\n"
+        "Analyze the PR description and return ONLY a JSON object with exactly two keys.\n"
+        "Valid values for 'pr_nature': 'bug_fix', 'feature', 'refactoring', 'documentation', 'other'.\n"
+        "Valid values for 'clarity_level': 'insufficient', 'basic', 'good', 'excellent'.\n"
+        "Return ONLY the JSON object. No explanations, no markdown, no extra text.\n"
+        'Example: {"pr_nature": "feature", "clarity_level": "good"}\n'
+        f"\nRepository: {record.repo}\n"
+        f"Path: {record.path[:100]}\n"
+        f"PR Description: {record.body[:1000]}\n"
+    )
+
+    api_key = os.getenv("GROQ_API_KEY")
+    model = "llama-3.1-8b-instant"
+    logger.debug(f"Usando modelo LLM: {model} para classify_pr_nature_and_clarity_single")
 
     client = _build_client(api_key)
     return _invoke_with_retry(client=client, model=model, prompt=prompt)
