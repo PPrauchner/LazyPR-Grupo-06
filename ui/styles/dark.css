@@ -1,0 +1,408 @@
+.stApp {
+  background-color: #020817;
+  color: #f8fafc;
+}
+
+[data-testid="stAppViewContainer"] {
+  background:
+    radial-gradient(circle at top, rgba(124, 58, 237, 0.1), transparent 35%),
+    #020817;
+}
+
+[data-testid="stHeader"] {
+  background-color: transparent;
+}
+
+[data-testid="stToolbar"] {
+  right: 2rem;
+}
+
+section[data-testid="stSidebar"] {
+  background: linear-gradient(
+    180deg,
+    rgba(15, 23, 42, 0.96),
+    rgba(2, 8, 23, 0.98)
+  );
+
+  border-right: 1px solid #334155;
+
+  box-shadow: 4px 0 30px rgba(0, 0, 0, 0.35);
+}
+
+label,
+span,
+p,
+div,
+small,
+h1,
+h2,
+h3,
+h4,
+h5,
+h6 {
+  color: #f8fafc;
+}
+
+.block-container {
+  padding-top: 2rem;
+}
+
+div[data-testid="metric-container"] {
+  background: linear-gradient(135deg, #111827, rgba(124, 58, 237, 0.06));
+
+  border: 1px solid #1f2937;
+
+  border-radius: 18px;
+
+  padding: 1rem;
+
+  box-shadow: 0 0 18px rgba(124, 58, 237, 0.06);
+
+  overflow: hidden;
+}
+
+div[role="radiogroup"] label {
+  border-radius: 12px;
+
+  padding: 0.55rem 0.8rem;
+
+  margin-bottom: 0.4rem;
+
+  transition: all 0.2s ease;
+
+  border: 1px solid transparent;
+}
+
+div[role="radiogroup"] label:hover {
+  background-color: rgba(255, 255, 255, 0.06);
+
+  border: 1px solid rgba(124, 58, 237, 0.2);
+}
+
+div[role="radiogroup"] label[data-baseweb="radio"] {
+  background: linear-gradient(
+    135deg,
+    rgba(124, 58, 237, 0.28),
+    rgba(124, 58, 237, 0.14)
+  );
+
+  border: 1px solid rgba(124, 58, 237, 0.35);
+
+  box-shadow: 0 0 12px rgba(124, 58, 237, 0.12);
+}
+
+.stTextInput input,
+.stNumberInput input,
+textarea {
+  background-color: #111827 !important;
+
+  color: #f8fafc !important;
+
+  border-radius: 12px !important;
+
+  border: 1px solid #334155 !important;
+}
+
+.stSelectbox div,
+.stMultiSelect div {
+  background-color: #111827 !important;
+
+  color: #f8fafc !important;
+
+  border-radius: 12px !important;
+
+  border: 1px solid #334155 !important;
+}
+
+.stDateInput {
+  margin-top: 0.3rem;
+}
+
+.stDateInput input {
+  background-color: #111827 !important;
+
+  border-radius: 12px !important;
+
+  border: 1px solid #334155 !important;
+
+  color: #f8fafc !important;
+}
+[data-baseweb="calendar"] {
+  background-color: #111827 !important;
+
+  border: 1px solid #334155 !important;
+
+  border-radius: 16px !important;
+
+  color: #f8fafc !important;
+
+  box-shadow: 0 0 25px rgba(0, 0, 0, 0.35) !important;
+  /* Cabeçalho do calendário */
+
+  [data-baseweb="calendar-header"] {
+    background-color: #111827 !important;
+
+    color: #f8fafc !important;
+  }
+
+  /* Texto mês/ano */
+
+  [data-baseweb="calendar"] select,
+  [data-baseweb="calendar"] button,
+  [data-baseweb="calendar"] span {
+    color: #f8fafc !important;
+  }
+
+  [data-baseweb="calendar"] td[aria-disabled="true"] {
+    background-color: #111827 !important;
+
+    color: #475569 !important;
+  }
+
+  [data-baseweb="calendar"] td {
+    background-color: #1e293b !important;
+  }
+}
+[data-baseweb="input"] {
+  background-color: #111827 !important;
+
+  border: 1px solid #334155 !important;
+
+  border-radius: 12px !important;
+}
+
+[data-baseweb="input"] input {
+  background-color: #111827 !important;
+
+  color: #f8fafc !important;
+}
+
+[data-baseweb="calendar"] * {
+  color: #f8fafc !important;
+}
+
+[data-baseweb="calendar"] td {
+  border-radius: 10px !important;
+}
+
+[data-baseweb="calendar"] td:hover {
+  background-color: rgba(124, 58, 237, 0.18) !important;
+}
+
+[data-baseweb="calendar"] [aria-selected="true"] {
+  background-color: #7c3aed !important;
+
+  color: white !important;
+
+  border-radius: 999px !important;
+}
+
+.stMultiSelect,
+.stSelectbox,
+.stDateInput {
+  margin-bottom: 0.55rem;
+}
+
+.stDataFrame {
+  border-radius: 14px;
+
+  overflow: hidden;
+
+  border: 1px solid #1f2937;
+}
+
+.stButton button,
+.stDownloadButton button {
+  border-radius: 12px;
+
+  border: 1px solid rgba(255, 255, 255, 0.06);
+
+  background-color: #111827;
+
+  color: #f8fafc;
+
+  transition: all 0.2s ease;
+}
+
+.stButton button:hover,
+.stDownloadButton button:hover {
+  border: 1px solid rgba(124, 58, 237, 0.4);
+
+  box-shadow: 0 0 12px rgba(124, 58, 237, 0.12);
+
+  transform: translateY(-1px);
+}
+
+::-webkit-scrollbar {
+  width: 10px;
+}
+
+::-webkit-scrollbar-track {
+  background: #020817;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #334155;
+
+  border-radius: 999px;
+}
+
+hr {
+  border-color: rgba(148, 163, 184, 0.15);
+}
+
+.streamlit-expanderHeader {
+  background-color: #111827;
+
+  border-radius: 12px;
+
+  border: 1px solid #334155;
+}
+
+.js-plotly-plot .plotly .hoverlayer {
+  font-family: inherit;
+}
+
+[data-testid="stFileUploader"] {
+  background: linear-gradient(
+    135deg,
+    rgba(15, 23, 42, 0.95),
+    rgba(30, 41, 59, 0.92)
+  ) !important;
+
+  border: 1px dashed rgba(124, 58, 237, 0.35) !important;
+
+  border-radius: 18px !important;
+
+  padding: 1rem !important;
+
+  box-shadow: 0 0 18px rgba(124, 58, 237, 0.06);
+
+  transition: 0.2s ease;
+}
+
+[data-testid="stFileUploader"]:hover {
+  border: 1px dashed rgba(124, 58, 237, 0.55) !important;
+
+  box-shadow: 0 0 24px rgba(124, 58, 237, 0.12);
+}
+
+[data-testid="stFileUploaderDropzone"] {
+  background: transparent !important;
+
+  border: none !important;
+}
+
+[data-testid="stFileUploader"] * {
+  color: #f8fafc !important;
+}
+
+[data-testid="stBaseButton-secondary"] {
+  background: linear-gradient(
+    135deg,
+    rgba(124, 58, 237, 0.2),
+    rgba(124, 58, 237, 0.12)
+  ) !important;
+
+  border: 1px solid rgba(124, 58, 237, 0.35) !important;
+
+  color: #f8fafc !important;
+
+  border-radius: 12px !important;
+
+  font-weight: 600 !important;
+
+  transition: 0.2s ease !important;
+}
+
+[data-testid="stBaseButton-secondary"]:hover {
+  border: 1px solid rgba(124, 58, 237, 0.55) !important;
+
+  box-shadow: 0 0 16px rgba(124, 58, 237, 0.14);
+}
+
+[data-testid="stToast"] {
+  background: linear-gradient(135deg, #111827, #1e293b) !important;
+
+  border: 1px solid rgba(124, 58, 237, 0.35);
+
+  color: #f8fafc !important;
+
+  border-radius: 14px !important;
+
+  box-shadow: 0 0 24px rgba(124, 58, 237, 0.14);
+}
+
+[data-testid="stToast"] * {
+  color: #f8fafc !important;
+}
+
+[data-testid="stToast"] {
+  background: linear-gradient(
+    135deg,
+    rgba(16, 185, 129, 0.22),
+    rgba(5, 150, 105, 0.18),
+    rgba(6, 78, 59, 0.95)
+  ) !important;
+
+  border: 1px solid rgba(52, 211, 153, 0.38) !important;
+
+  color: #ecfdf5 !important;
+
+  border-radius: 14px !important;
+
+  backdrop-filter: blur(12px);
+
+  box-shadow:
+    0 0 18px rgba(16, 185, 129, 0.18),
+    0 0 34px rgba(34, 197, 94, 0.12);
+
+  transition: 0.2s ease;
+}
+
+[data-testid="stToast"] * {
+  color: #ecfdf5 !important;
+
+  font-weight: 600;
+}
+
+[data-testid="stToast"]:hover {
+  box-shadow:
+    0 0 24px rgba(16, 185, 129, 0.24),
+    0 0 42px rgba(34, 197, 94, 0.16);
+}
+
+/* Dropdown aberto do multiselect */
+
+div[data-baseweb="popover"] {
+  background: #111827 !important;
+}
+
+div[data-baseweb="menu"] {
+  background: #111827 !important;
+  border: 1px solid #334155 !important;
+}
+
+ul[role="listbox"] {
+  background: #111827 !important;
+}
+
+li[role="option"] {
+  background: #111827 !important;
+  color: #f8fafc !important;
+}
+
+li[role="option"]:hover {
+  background: #1e293b !important;
+}
+
+li[aria-selected="true"] {
+  background: #312e81 !important;
+  color: white !important;
+}
+
+/* Texto das opções */
+
+[data-baseweb="menu"] * {
+  color: #f8fafc !important;
+}

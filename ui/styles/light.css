@@ -1,0 +1,92 @@
+.stApp {
+  background-color: #f8fafc;
+  color: #111827;
+}
+
+section[data-testid="stSidebar"] {
+  background-color: #ffffff;
+  border-right: 1px solid #e5e7eb;
+  box-shadow: 4px 0 25px rgba(0, 0, 0, 0.06);
+}
+
+div[data-testid="metric-container"] {
+  background-color: white;
+  border: 1px solid #e5e7eb;
+  border-radius: 16px;
+  padding: 1rem;
+  box-shadow: 0 0 20px rgba(124, 58, 237, 0.06);
+}
+
+.block-container {
+  padding-top: 2rem;
+}
+
+[data-testid="stAppViewContainer"] {
+  background-color: #f8fafc;
+}
+
+[data-testid="stHeader"] {
+  background-color: transparent;
+}
+
+[data-testid="stToolbar"] {
+  right: 2rem;
+}
+
+div[role="radiogroup"] label {
+  border-radius: 12px;
+  padding: 0.45rem 0.75rem;
+  margin-bottom: 0.35rem;
+  transition: 0.2s ease;
+}
+
+div[role="radiogroup"] label:hover {
+  background-color: rgba(0, 0, 0, 0.04);
+}
+
+div[role="radiogroup"] label[data-baseweb="radio"] {
+  background-color: rgba(124, 58, 237, 0.14);
+  border: 1px solid rgba(124, 58, 237, 0.2);
+}
+
+.stDataFrame {
+  border-radius: 12px;
+  overflow: hidden;
+}
+
+.stTextInput input,
+.stSelectbox div,
+.stMultiSelect div,
+.stDateInput input {
+  border-radius: 10px;
+}
+
+/* Hero Section */
+
+h1,
+h2,
+h3,
+h4 {
+  color: #0f172a !important;
+}
+
+p {
+  color: #334155 !important;
+}
+
+/* Texto do Hero */
+
+.hero-title {
+  color: #0f172a !important;
+}
+
+.hero-subtitle {
+  color: #334155 !important;
+}
+
+/* Cards */
+
+[data-testid="stMetric"] {
+  border: 1px solid #dbe4ee !important;
+  background: #ffffff !important;
+}
