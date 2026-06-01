@@ -2,7 +2,7 @@
 
 > Análise funcional e semântica de pull requests do GitHub com classificação via LLMs.
 
-**LazyPR** é uma ferramenta de análise de pull requests que combina programação funcional em Python com modelos de linguagem para extrair padrões de contribuição em projetos de código aberto. O sistema ingere datasets volumosos de forma *lazy*, classifica semanticamente cada PR e gera dashboards interativos com os resultados.
+**LazyPR** é uma plataforma de análise de pull requests que combina programação funcional em Python com modelos de linguagem de grande porte (LLMs) para extrair padrões de contribuição em projetos de código aberto. O sistema ingere datasets volumosos de forma *lazy*, classifica semanticamente cada PR e gera dashboards interativos com os resultados enriquecidos.
 
 ---
 
@@ -13,41 +13,46 @@
 - [Arquitetura](#arquitetura)
 - [Estrutura do Projeto](#estrutura-do-projeto)
 - [Módulos e Responsabilidades](#módulos-e-responsabilidades)
+- [Pipeline Funcional](#pipeline-funcional)
+- [Dataset](#dataset)
 - [Instalação](#instalação)
 - [Configuração](#configuração)
 - [Uso](#uso)
-- [Pipeline Funcional](#pipeline-funcional)
-- [Dataset](#dataset)
+- [Cache e Persistência](#cache-e-persistência)
+- [Rate Limiting](#rate-limiting)
 - [Stack Tecnológica](#stack-tecnológica)
+- [Testes](#testes)
 - [Equipe](#equipe)
 
 ---
 
 ## Visão Geral
 
-Projetos hospedados no GitHub acumulam históricos extensos de pull requests que contêm informações valiosas sobre qualidade de contribuição, padrões de revisão e dinâmica de comunidade. Analisar esse volume manualmente é inviável.
+Projetos hospedados no GitHub acumulam históricos extensos de pull requests contendo informações valiosas sobre qualidade de contribuição, padrões de revisão e dinâmica de comunidade. Analisar esse volume manualmente é inviável.
 
 O LazyPR resolve esse problema com três pilares:
 
-1. **Ingestão lazy** — datasets com milhões de registros são processados linha a linha via geradores Python, sem pressão sobre a memória RAM.
-2. **Pipeline funcional** — todas as transformações, filtros e agregações são implementados como funções puras e compostas via funções de ordem superior, garantindo previsibilidade e testabilidade.
-3. **Enriquecimento semântico por LLM** — modelos de linguagem classificam o tipo de cada repositório, a natureza de cada PR e a qualidade da sua descrição, com cache persistente para evitar chamadas repetidas.
+1. **Ingestão lazy** — datasets com milhões de registros são processados linha a linha via geradores Python, sem pressão sobre a memória RAM. A linguagem de programação de cada PR é inferida automaticamente a partir da extensão do arquivo comentado.
+
+2. **Pipeline funcional** — todas as transformações, filtros e agregações são implementados como funções puras e compostas via funções de ordem superior (`map`, `filter`, `reduce`), garantindo previsibilidade e testabilidade.
+
+3. **Enriquecimento semântico por LLM** — modelos de linguagem (Groq/llama) classificam o tipo de cada repositório, a natureza de cada PR e a qualidade da sua descrição. Classificações são armazenadas em cache persistente indexado por hash SHA-256 para evitar chamadas repetidas.
 
 ---
 
 ## Funcionalidades
 
-| # | Funcionalidade | Issue |
+| # | Funcionalidade | História de Usuário |
 |---|---|---|
-| 01 | Upload e ingestão lazy de datasets CSV/JSON | `#01` |
-| 02 | Categorização de repositórios por tipo (biblioteca, framework, app web…) | `#02` |
-| 03 | Classificação da natureza de cada PR (bug fix, feature, refatoração, docs) | `#03` |
-| 04 | Avaliação da clareza da descrição (insuficiente → excelente) | `#04` |
-| 05 | Dashboard de volume de PRs estratificado por linguagem, tipo e natureza | `#05` |
-| 06 | Visualização da distribuição de tamanho de descrição (chars e palavras) | `#06` |
-| 07 | Gráfico de correlação entre clareza, tipo de projeto e linguagem | `#07` |
-| 08 | Sistema de filtros dinâmicos globais aplicados a todas as visualizações | `#08` |
-| 09 | Exportação dos resultados enriquecidos em CSV e JSON | `#09` |
+| 01 | Upload e ingestão lazy de datasets CSV/JSON de pull requests | HU 01 |
+| 02 | Categorização de repositórios por tipo (biblioteca, framework, app web, CLI) | HU 02 |
+| 03 | Classificação da natureza de cada PR (bug fix, feature, refatoração, documentação) | HU 03 |
+| 04 | Avaliação da clareza da descrição (insuficiente → excelente) | HU 04 |
+| 05 | Dashboard de volume de PRs estratificado por linguagem, tipo e natureza | HU 05 |
+| 06 | Visualização da distribuição de tamanho de descrição (caracteres e palavras) | HU 06 |
+| 07 | Gráfico de correlação entre clareza, tipo de projeto e linguagem | HU 07 |
+| 08 | Sistema de filtros dinâmicos globais aplicados a todas as visualizações | HU 08 |
+| 09 | Exportação dos resultados enriquecidos em CSV e JSON | HU 09 |
 
 ---
 
@@ -78,72 +83,93 @@ O projeto segue o padrão **Functional Core / Imperative Shell**:
 
 **Princípios que guiam a implementação:**
 
-- Funções puras em `core/` — mesma entrada sempre produz mesma saída, sem efeitos colaterais
-- Efeitos colaterais (I/O, LLM, rede) isolados em `services/` e `utils/`
-- Dados tratados como imutáveis — `NamedTuple` e `dataclass(frozen=True)` em todo o domínio
-- Avaliação preguiçosa via `yield` e `itertools` para suportar datasets com milhões de registros
-- Memoização automática de classificações LLM com chave SHA-256 do conteúdo
+- **Funções puras** em `core/` — mesma entrada sempre produz mesma saída, sem efeitos colaterais
+- **Efeitos colaterais isolados** (I/O, LLM, rede) em `services/` e `utils/`
+- **Imutabilidade** — `NamedTuple` em todo o domínio de dados (`PRRecord`, `AnalysisResult`)
+- **Avaliação preguiçosa** via `yield` e `itertools` para suportar datasets volumosos sem carregar em memória
+- **Memoização** de classificações LLM com chave SHA-256 do conteúdo, persistida em disco entre sessões
+- **Composição** de funções via `pipe()` e `compose()` para construção declarativa de pipelines
 
 ---
 
 ## Estrutura do Projeto
 
 ```
-LAZYPR-GRUPO-06/
+LazyPR-Grupo-06/
 │
-├── core/                          # Functional Core — funções puras, sem I/O
+├── core/                              # Functional Core — funções puras, sem I/O
 │   ├── models/
-│   │   ├── pr_record.py           # NamedTuple do PR bruto (pré-enriquecimento)
-│   │   └── analysis_result.py     # NamedTuple do PR enriquecido (pós-LLM)
+│   │   ├── pr_record.py               # NamedTuple imutável do PR bruto (pré-enriquecimento)
+│   │   └── analysis_result.py         # NamedTuple imutável do PR enriquecido (pós-LLM)
 │   │
 │   ├── pipeline/
-│   │   ├── composer.py            # compose() e pipe() — composição de funções
-│   │   └── runner.py              # run_pipeline() — execução lazy configurável
+│   │   ├── composer.py                # compose() e pipe() — composição de funções
+│   │   └── runner.py                  # run_pipeline() — execução lazy configurável por etapa
 │   │
 │   ├── transforms/
-│   │   ├── cleaning.py            # Limpeza de campos textuais (strip, nulos, truncate)
-│   │   ├── filtering.py           # Predicados e build_filter() para filtros compostos
-│   │   └── normalizing.py         # Padronização de valores + cálculo de char/word count
+│   │   ├── cleaning.py                # Limpeza de campos textuais (strip, nulos, truncate, HTML)
+│   │   ├── filtering.py               # Predicados puros e build_filter() para filtros compostos
+│   │   └── normalizing.py             # Padronização de valores + cálculo de char/word count
 │   │
-│   └── aggregations/
-│       ├── counters.py            # Contagens via reduce() por dimensão
-│       ├── grouping.py            # group_by() — agrupamentos multidimensionais
-│       └── metrics.py             # Médias, distribuições e correlation_summary()
+│   ├── aggregations/
+│   │   ├── counters.py                # Contagens via reduce() por dimensão (retorna dict imutável)
+│   │   ├── grouping.py                # group_by() — agrupamentos multidimensionais
+│   │   └── metrics.py                 # Estatísticas descritivas e correlation_summary()
+│   │
+│   └── validators/
+│       └── dataset_schema.py          # Validação de schema do CSV na ingestão
 │
-├── services/                      # Imperative Shell — efeitos colaterais isolados
-│   ├── ingestion.py               # Geradores lazy para CSV/JSON (stream_csv, stream_json)
-│   ├── llm_client.py              # Chamadas Agno/Groq — classify_batch()
-│   ├── classifiers.py             # Orquestra batching, cache e chamadas ao LLM
-│   ├── storage.py                 # Persistência de análises indexadas por hash
-│   └── exporters.py               # Serialização CSV/JSON + bytes para download
+├── services/                          # Imperative Shell — efeitos colaterais isolados
+│   ├── ingestion.py                   # stream_csv(), stream_json() — geradores lazy linha a linha
+│   ├── llm_client.py                  # Chamadas Groq/llama com retry, throttle e backoff
+│   ├── classifiers.py                 # Orquestra batching por repo, cache e chamadas ao LLM
+│   ├── storage.py                     # Persistência de análises indexadas por hash SHA-256
+│   └── exporters.py                   # Serialização CSV/JSON + bytes para download Streamlit
 │
-├── ui/                            # Interface gráfica — componentes Streamlit
-│   ├── components.py              # Widgets reutilizáveis (cards, tabelas, banners)
-│   ├── charts.py                  # Funções de plotagem (bar, distribution, heatmap)
-│   └── sidebar_filters.py         # Controles de filtro → predicados funcionais
+├── ui/                                # Componentes de interface reutilizáveis
+│   ├── components.py                  # metric_card(), data_table(), status_banner(), download_buttons()
+│   ├── charts.py                      # bar_chart_by_category(), distribution_chart_from_bins()
+│   ├── layout.py                      # Helpers de layout e seções visuais
+│   ├── sidebar_filters.py             # Filtros globais → get_active_filters() retorna Predicate
+│   └── theme.py                       # Tema visual e inicialização de estilos
 │
-├── views/                         # Páginas do Streamlit (roteamento automático)
-│   ├── 1_upload.py                # Tela de upload e ingestão do dataset
-│   ├── 2_overview.py              # Dashboard de volume e distribuição (Issues 05, 06)
-│   ├── 3_correlation.py           # Gráfico de correlação multidimensional (Issue 07)
-│   └── 4_export.py                # Exportação de resultados (Issue 09)
+├── views/                             # Páginas do Streamlit (roteadas por main.py)
+│   ├── home.py                        # Página inicial — KPIs, pipeline visual, acesso rápido
+│   ├── upload.py                      # Upload e ingestão do dataset com validação de schema
+│   ├── overview.py                    # Dashboard de volume e distribuições (HU 05, 06)
+│   ├── cleaning_dashboard.py          # Visualização dos dados após etapa de limpeza
+│   ├── normalization_dashboard.py     # Visualização dos dados após etapa de normalização
+│   ├── correlations_dashboard.py      # Gráfico de correlação multidimensional (HU 07)
+│   └── export.py                      # Exportação de resultados enriquecidos (HU 09)
 │
-├── tests/                         # Testes unitários focados nas funções puras
-│   ├── test_cleaning.py
-│   ├── test_filtering.py
+├── tests/                             # Testes unitários focados nas funções puras
+│   ├── conftest.py                    # Fixtures compartilhadas (PRRecord e AnalysisResult)
+│   ├── transforms/
+│   │   ├── test_cleaning.py
+│   │   ├── test_filtering.py
+│   │   └── test_global_filters.py
+│   ├── aggregations/
+│   │   └── test_grouping.py
+│   ├── pipeline/
+│   │   ├── test_composer.py
+│   │   └── test_runner.py
+│   ├── pages/
+│   │   └── test_upload.py
+│   ├── ui/
+│   │   └── test_sidebar_filters.py
+│   ├── test_classifiers.py
+│   ├── test_hashing.py
+│   ├── test_memoization.py
 │   ├── test_normalizing.py
-│   ├── test_counters.py
-│   ├── test_grouping.py
-│   ├── test_metrics.py
-│   ├── test_composer.py
-│   └── test_hashing.py
+│   └── test_storage.py
 │
-├── utils/                         # Helpers genéricos
-│   ├── memoization.py             # Decorador memoize() + cached_classify()
-│   └── hashing.py                 # hash_content(), hash_file_stream(), hash_record()
+├── utils/                             # Helpers genéricos
+│   ├── hashing.py                     # hash_content(), hash_file_stream(), hash_record()
+│   └── memoization.py                 # cached_classify() com lookup em disco via storage.py
 │
-├── main.py                        # Ponto de entrada — configuração e init do Streamlit
-├── pyproject.toml                 # Dependências e metadados (gerenciado via uv)
+├── main.py                            # Ponto de entrada — configuração e roteamento Streamlit
+├── pyproject.toml                     # Dependências e metadados (gerenciado via uv)
+├── .env.example                       # Template de variáveis de ambiente
 └── README.md
 ```
 
@@ -155,56 +181,146 @@ LAZYPR-GRUPO-06/
 
 | Módulo | Responsabilidade |
 |---|---|
-| `pr_record.py` | `NamedTuple` imutável representando um PR bruto: id, repositório, título, corpo, autor, linguagem, data |
-| `analysis_result.py` | `NamedTuple` imutável com os campos de `PRRecord` + classificações LLM: `project_type`, `pr_nature`, `clarity_level`, `char_count`, `word_count` |
+| `pr_record.py` | `NamedTuple` imutável representando um PR bruto: `id`, `html_url`, `repo`, `path`, `body`, `diff_hunk`, `author`, `author_association`, `commit_id`, `line`, `language`, `created_at` |
+| `analysis_result.py` | `NamedTuple` imutável com todos os campos de `PRRecord` acrescidos das classificações LLM (`project_type`, `pr_nature`, `clarity_level`) e métricas calculadas (`char_count`, `word_count`) |
 
 ### `core/pipeline/`
 
 | Módulo | Responsabilidade |
 |---|---|
 | `composer.py` | `compose(*fns)` e `pipe(*fns)` — combinam etapas de transformação em uma função única sem efeitos colaterais |
-| `runner.py` | `run_pipeline(steps, source)` — executa etapas habilitadas de forma lazy sobre o stream de `PRRecord`, retorna gerador de `AnalysisResult` |
+| `runner.py` | `run_pipeline(source, config)` — executa as etapas habilitadas (limpeza, normalização, filtragem, classificação) de forma lazy sobre o stream de `PRRecord`, retorna `Generator[AnalysisResult]` |
 
 ### `core/transforms/`
 
 | Módulo | Responsabilidade |
 |---|---|
-| `cleaning.py` | Strip, remoção de nulos, truncamento para limite do LLM, remoção de artefatos de encoding — tudo via `map()` e funções puras |
-| `filtering.py` | Predicados por linguagem, tipo, natureza e clareza; `build_filter(*predicates)` compõe critérios por conjunção lógica |
-| `normalizing.py` | Padroniza strings de linguagem, converte datas, calcula `char_count` e `word_count`, normaliza labels retornados pelo LLM |
+| `cleaning.py` | Strip, substituição de nulos, remoção de caracteres de controle, decodificação de entidades HTML, remoção de comentários ocultos, normalização de quebras de linha, truncamento de body/diff para limites do LLM |
+| `filtering.py` | Predicados puros por linguagem, tipo de projeto, natureza e clareza; `compose_predicates()` combina por conjunção (AND entre dimensões, OR dentro de cada uma) |
+| `normalizing.py` | Padroniza strings de linguagem para forma canônica (`"Python 3"` → `"python"`), normaliza labels LLM para vocabulário controlado, calcula `char_count` e `word_count`; funções anotadas com `@lru_cache` |
 
 ### `core/aggregations/`
 
 | Módulo | Responsabilidade |
 |---|---|
-| `counters.py` | Contagens e distribuições percentuais por dimensão via `reduce()`, produz estruturas imutáveis para os gráficos |
-| `grouping.py` | `group_by(key_fn, records)` — agrupa por qualquer combinação de dimensões, retorna mapa imutável de chave → tupla |
-| `metrics.py` | Média, mediana, min/max de `char_count`/`word_count`; `correlation_summary()` para a visualização de padrões da Issue 07 |
+| `counters.py` | `count_by(records, key_fn)` via `reduce()` — contagem genérica por qualquer dimensão; wrappers `count_by_language()`, `count_by_project_type()`, `count_by_pr_nature()`; retorna `MappingProxyType` imutável |
+| `grouping.py` | `group_by(key_fn, records)` — agrupa por função chave via `reduce()`, retorna `dict[chave → tuple]` |
+| `metrics.py` | `description_stats()` (min/max/média/mediana de chars e palavras via `reduce()`), `char_distribution()` e `word_distribution()` (frequência por faixas), `correlation_summary()` (proporções de clareza por grupo) |
 
 ### `services/`
 
 | Módulo | Responsabilidade |
 |---|---|
-| `ingestion.py` | `stream_csv()` e `stream_json()` — geradores `yield` linha a linha; calcula hash SHA-256 do arquivo durante a leitura |
-| `llm_client.py` | `classify_batch(prompts)` via Agno/Groq; prompts retornam JSON; retry com backoff; chave de API por variável de ambiente |
-| `classifiers.py` | Orquestra batching por repositório (Dica 06), consulta cache antes de chamar o LLM, pós-processa JSON via `normalizing.py` |
-| `storage.py` | Persiste e carrega análises por hash do dataset; `has_cached_analysis()`, `load_results()`, `save_results()` |
-| `exporters.py` | `export_csv()`, `export_json()`, `to_download_bytes()` para o botão de download do Streamlit |
+| `ingestion.py` | `stream_csv()` e `stream_json()` — geradores `yield from map(...)` linha a linha; inferência de linguagem pela extensão do arquivo (`_infer_language_from_path`); extração de `repo` da URL; cálculo de hash SHA-256 durante a leitura |
+| `llm_client.py` | Chamadas à API Groq com throttle (2.1s entre requisições para respeitar 30 RPM do plano gratuito), retry com backoff exponencial, extração do tempo de espera de erros 429; `classify_pr_nature_and_clarity_single()` unifica duas classificações em uma chamada |
+| `classifiers.py` | Agrupa PRs por repositório via `group_by()`; chave de cache composta por `repo:ids_ordenados`; `cached_classify()` verifica disco antes de chamar LLM; sempre sobrescreve `language` e `created_at` com os valores do `PRRecord` atual após cache hit |
+| `storage.py` | `has_cached_analysis()`, `load_results()`, `save_results()` — persistência JSON atômica (escrita em `.tmp` + `os.replace`) indexada por hash SHA-256 |
+| `exporters.py` | `export_csv()`, `export_json()` (escrita atômica em disco), `to_download_bytes()` para o botão de download do Streamlit |
 
 ### `ui/`
 
 | Módulo | Responsabilidade |
 |---|---|
-| `components.py` | `metric_card()`, `data_table()`, `status_banner()`, `download_buttons()` — recebem dados processados, sem lógica de negócio |
-| `charts.py` | `bar_chart_by_category()`, `distribution_chart()`, `correlation_heatmap()` — recebem saídas de `aggregations/`, retornam figuras |
-| `sidebar_filters.py` | Renderiza controles de filtro; `get_active_filters()` retorna função de filtro composta pronta para o pipeline |
+| `components.py` | `metric_card()`, `data_table()`, `status_banner()`, `download_buttons()` — widgets reutilizáveis que recebem dados processados, sem lógica de negócio |
+| `charts.py` | `bar_chart_by_category()`, `distribution_chart_from_bins()` — recebem saídas de `aggregations/`, retornam figuras Plotly |
+| `sidebar_filters.py` | Renderiza controles de filtro na sidebar; `get_active_filters()` retorna `Predicate` composta pronta para `apply_filters()` |
 
 ### `utils/`
 
 | Módulo | Responsabilidade |
 |---|---|
-| `memoization.py` | `memoize(fn)` como decorador; `cached_classify()` com lookup por hash; integra com `storage.py` para persistência cross-sessão |
-| `hashing.py` | `hash_content(text)`, `hash_file_stream(stream)`, `hash_record(pr_record)` — SHA-256 determinístico para cache |
+| `hashing.py` | `hash_content(text)`, `hash_file_stream(stream)` — SHA-256 determinístico para chaves de cache |
+| `memoization.py` | `cached_classify(fn, hash)` — verifica cache em disco via `storage.py` antes de executar a função; `clear_cache()` limpa caches LRU de normalização |
+
+---
+
+## Pipeline Funcional
+
+O pipeline é configurável: cada etapa pode ser ativada ou desativada via `PipelineConfig` sem alterar o código das transformações.
+
+```python
+from services.ingestion import stream_csv
+from core.pipeline.runner import run_pipeline, PipelineConfig
+
+# Configuração declarativa das etapas
+config = PipelineConfig(
+    enable_cleaning=True,        # Limpeza de campos textuais
+    enable_normalization=True,   # Padronização de linguagem e labels
+    enable_filtering=True,       # Filtros globais da sidebar
+    enable_classification=True,  # Classificações LLM (project_type, pr_nature, clarity_level)
+)
+
+# Ingestão lazy — nenhum registro é carregado em memória completamente
+source = stream_csv("dataset.csv")
+
+# Pipeline retorna Generator[AnalysisResult] — avaliação sob demanda
+results = run_pipeline(source, config)
+
+# Consumo downstream (lazy)
+for result in results:
+    print(result.language, result.project_type, result.pr_nature, result.clarity_level)
+```
+
+### Etapas do Pipeline
+
+```
+stream_csv() → PRRecord
+       │
+       ▼ [enable_cleaning]
+clean_pr_record() → PRRecord (body/diff truncados, HTML removido)
+       │
+       ▼ [enable_normalization]
+normalize_pr_record() → PRRecord (language em forma canônica)
+       │
+       ▼ [enable_filtering]
+apply_filters([predicate]) → PRRecord (apenas os que passam)
+       │
+       ▼ [enable_classification]
+classify_project_type() → AnalysisResult
+  ├── 1 chamada LLM por repositório (batching)
+  └── 1 chamada LLM por PR (pr_nature + clarity_level combinados)
+       │
+       ▼
+AnalysisResult (completo, pronto para visualização e exportação)
+```
+
+---
+
+## Dataset
+
+O dataset padrão utilizado é o **GitHub Public Pull Request Comments**, disponível no Kaggle:
+
+🔗 [kaggle.com/datasets/pelmers/github-public-pull-request-comments](https://www.kaggle.com/datasets/pelmers/github-public-pull-request-comments?resource=download)
+
+### Schema do Dataset Kaggle
+
+| Campo | Tipo | Descrição |
+|---|---|---|
+| `id` | `int` | Identificador único do comentário de PR |
+| `html_url` | `str` | URL completa do comentário (usada para extrair `owner/repo`) |
+| `path` | `str` | Caminho do arquivo comentado (ex: `src/main.go`) |
+| `body` | `str` | Texto do comentário de revisão |
+| `diff_hunk` | `str` | Trecho do diff associado ao comentário |
+| `user` | `str` | Login do autor (mapeado internamente para `author`) |
+| `author_association` | `str` | Relação do autor com o repo (`OWNER`, `MEMBER`, `CONTRIBUTOR`, `NONE`) |
+| `commit_id` | `str` | Hash SHA do commit referenciado |
+| `line` | `int` | Linha do arquivo comentada |
+| `created_at` | `str` | Data/hora de criação em formato ISO 8601 |
+
+> **Nota:** O dataset não possui colunas `language` ou `repo`. Ambas são derivadas automaticamente: `repo` é extraído da `html_url` (`owner/name`) e `language` é inferida da extensão do arquivo em `path` (`.py` → `python`, `.go` → `go`, `.ts` → `typescript`, etc.).
+
+### Extensões de Arquivo Suportadas para Inferência de Linguagem
+
+| Extensão | Linguagem | Extensão | Linguagem |
+|---|---|---|---|
+| `.py` | python | `.rb` | ruby |
+| `.js`, `.jsx` | javascript | `.php` | php |
+| `.ts`, `.tsx` | typescript | `.dart` | dart |
+| `.java` | java | `.kt` | kotlin |
+| `.go` | go | `.swift` | swift |
+| `.rs` | rust | `.scala` | scala |
+| `.c` | c | `.cs` | csharp |
+| `.cpp`, `.cc`, `.cxx` | cpp | | |
 
 ---
 
@@ -213,42 +329,56 @@ LAZYPR-GRUPO-06/
 ### Pré-requisitos
 
 - Python `>= 3.11`
-- [`uv`](https://github.com/astral-sh/uv) para gerenciamento de dependências
+- [`uv`](https://github.com/astral-sh/uv) para gerenciamento de dependências e ambientes virtuais
 
 ### Passos
 
 ```bash
 # 1. Clone o repositório
-git clone https://github.com/SEU-ORG/LAZYPR-GRUPO-06.git
-cd LAZYPR-GRUPO-06
+git clone https://github.com/PPrauchner/LazyPR-Grupo-06.git
+cd LazyPR-Grupo-06
 
-# 2. Instale as dependências com uv
+# 2. Instale as dependências e crie o ambiente virtual
 uv sync
 
 # 3. Ative o ambiente virtual
-source .venv/bin/activate   # Linux/macOS
-.venv\Scripts\activate      # Windows
+source .venv/bin/activate      # Linux/macOS
+.venv\Scripts\activate         # Windows (PowerShell)
 ```
 
 ---
 
 ## Configuração
 
-Crie um arquivo `.env` na raiz do projeto com as variáveis necessárias:
+Copie o arquivo de exemplo e preencha com suas credenciais:
 
-```env
-# Provedor LLM (escolha um)
-GROQ_API_KEY=sua_chave_aqui
-OPENROUTER_API_KEY=sua_chave_aqui
-
-# Diretório de cache de análises persistidas
-LAZYPR_CACHE_DIR=.cache/analyses
-
-# Limite de tokens enviados ao LLM por PR (default: 512)
-LAZYPR_MAX_TOKENS=512
+```bash
+cp .env.example .env
 ```
 
-> As chaves de API para **Groq** e **OpenRouter** podem ser obtidas gratuitamente em seus respectivos portais.
+Edite o arquivo `.env`:
+
+```env
+# Chave de API do Groq (obrigatório)
+# Obtenha gratuitamente em: https://console.groq.com/keys
+GROQ_API_KEY=sua_chave_aqui
+
+# Diretório de cache de análises persistidas (padrão: .cache)
+CACHE_DIR=.cache
+
+# Limite de caracteres do corpo do PR enviado ao LLM (padrão: 1500)
+LAZYPR_MAX_BODY_CHARS=1500
+```
+
+### Variáveis de Ambiente
+
+| Variável | Padrão | Obrigatório | Descrição |
+|---|---|---|---|
+| `GROQ_API_KEY` | — | ✅ | Chave de API do Groq para classificações LLM |
+| `CACHE_DIR` | `.cache` | ❌ | Diretório onde análises persistidas são armazenadas |
+| `LAZYPR_MAX_BODY_CHARS` | `1500` | ❌ | Limite de caracteres do `body` enviado ao LLM por PR |
+
+> **Groq** oferece acesso gratuito a modelos como `llama-3.1-8b-instant` com limite de 30 requisições por minuto no plano gratuito. O LazyPR respeita esse limite automaticamente com throttle de 2.1s entre chamadas.
 
 ---
 
@@ -260,99 +390,112 @@ LAZYPR_MAX_TOKENS=512
 streamlit run main.py
 ```
 
-### Fluxo básico
+A aplicação abrirá automaticamente em `http://localhost:8501`.
 
-1. **Upload** — acesse a página *Upload* e carregue o arquivo CSV/JSON do dataset
-2. **Processamento** — o pipeline executa as etapas de limpeza, normalização e classificação LLM automaticamente; análises são persistidas em cache para execuções futuras
-3. **Exploração** — navegue pelas páginas *Overview* e *Correlação* para visualizar os resultados
-4. **Filtragem** — use os controles da sidebar para filtrar por linguagem, tipo de projeto, natureza e clareza
-5. **Exportação** — na página *Export*, baixe os resultados enriquecidos em CSV ou JSON
+### Fluxo de análise
 
-### Executar os testes
+```
+1. Upload       → Carregue o arquivo CSV do dataset na página "Upload"
+2. Validação    → O sistema valida o schema e calcula o hash do arquivo
+3. Verificação  → Se o arquivo já foi analisado, os resultados são carregados do cache
+4. Pipeline     → Limpeza → Normalização → Filtragem → Classificação LLM
+5. Exploração   → Navegue por Overview, Limpeza, Normalização e Correlação
+6. Filtragem    → Use a sidebar para filtrar por linguagem, tipo, natureza e clareza
+7. Exportação   → Baixe os resultados enriquecidos em CSV ou JSON
+```
 
-```bash
-# Todos os testes
-uv run pytest tests/
+### Páginas disponíveis
 
-# Com cobertura
-uv run pytest tests/ --cov=core --cov-report=term-missing
+| Página | Descrição |
+|---|---|
+| 🏠 Home | KPIs gerais, visualização do pipeline e atalhos |
+| 📂 Upload | Upload do dataset, validação de schema e execução do pipeline |
+| 📊 Overview | Gráficos de volume por linguagem, tipo e natureza; distribuições de tamanho |
+| 🔥 Correlação | Mapa de calor e padrões entre clareza, tipo de projeto e linguagem |
+| 🧹 Limpeza | Visualização dos dados após etapa de limpeza textual |
+| ⚙️ Normalização | Visualização dos dados após etapa de normalização de valores |
+| 💾 Exportação | Download dos resultados enriquecidos em CSV e JSON |
+
+---
+
+## Cache e Persistência
+
+O LazyPR evita reprocessamento via dois mecanismos de cache:
+
+### Cache de sessão (LRU)
+
+Funções puras com resultados determinísticos (`normalize_language`, `normalize_label`) usam `@functools.lru_cache` para evitar recomputação dentro da mesma sessão.
+
+### Cache persistente em disco
+
+Classificações LLM são armazenadas como arquivos JSON no diretório `CACHE_DIR`, indexados por uma chave SHA-256 composta por `repo:ids_ordenados_do_batch`. Isso garante que:
+
+- Re-uploads do mesmo dataset são instantâneos
+- Datasets distintos com repositórios em comum não compartilham cache indevidamente
+- Os campos `language` e `created_at` são sempre atualizados com os dados do CSV atual (não ficam congelados no cache)
+
+```
+.cache/
+├── a1b2c3d4...json    # Classificações do batch golang/go:1,11,21
+├── e5f6a7b8...json    # Classificações do batch kubernetes/kubernetes:4,5,6
+└── ...
 ```
 
 ---
 
-## Pipeline Funcional
+## Rate Limiting
 
-O pipeline é declarativo: cada etapa é uma função pura passada como argumento para `run_pipeline()`. Etapas podem ser ativadas ou desativadas sem alterar o código das transformações.
+O plano gratuito do Groq permite **30 requisições por minuto (RPM)**. Para 50 PRs em 15 repositórios distintos, o LazyPR faz:
 
-```python
-from core.pipeline.composer import pipe
-from core.pipeline.runner import run_pipeline
-from core.transforms.cleaning import clean_record
-from core.transforms.normalizing import normalize_record
-from core.transforms.filtering import build_filter, is_language
-from services.ingestion import stream_csv
-from services.classifiers import classify_project_type, classify_pr_nature, classify_clarity
-
-# Predicado de filtro composto
-only_python = build_filter(is_language("Python"))
-
-# Composição declarativa das etapas
-steps = [
-    clean_record,
-    normalize_record,
-    only_python,           # etapa opcional — remova para processar todas as linguagens
-    classify_project_type,
-    classify_pr_nature,
-    classify_clarity,
-]
-
-# Execução lazy sobre o stream — nenhum registro é carregado em memória integralmente
-results = run_pipeline(steps, source=stream_csv("dataset.csv"))
-
-# Consumo downstream (gerador — avaliação sob demanda)
-for result in results:
-    print(result.project_type, result.pr_nature, result.clarity_level)
-```
-
----
-
-## Dataset
-
-O dataset padrão utilizado é o **GitHub Public Pull Request Comments**, disponível no Kaggle:
-
-🔗 [kaggle.com/datasets/pelmers/github-public-pull-request-comments](https://www.kaggle.com/datasets/pelmers/github-public-pull-request-comments?resource=download)
-
-O sistema também aceita qualquer arquivo CSV ou JSON Lines com os campos mínimos:
-
-| Campo | Tipo | Descrição |
+| Tipo de chamada | Quantidade | Estratégia |
 |---|---|---|
-| `id` | `str` | Identificador único do PR |
-| `repo` | `str` | Nome do repositório (`owner/name`) |
-| `title` | `str` | Título do pull request |
-| `body` | `str` | Descrição do pull request |
-| `language` | `str` | Linguagem principal do repositório |
-| `created_at` | `str` | Data de criação (ISO 8601) |
+| `classify_project_type_batch` | 1 por repositório | Batching: todos os PRs do repo em uma chamada |
+| `classify_pr_nature_and_clarity_single` | 1 por PR | Unificado: natureza + clareza em um único JSON |
+| **Total** | **~65 chamadas** | Redução de 43% vs. chamadas separadas |
+
+O throttle de **2.1s entre requisições** garante ≤28 RPM, com análise de 50 PRs concluída em ~2 minutos. Em caso de erro 429, o sistema extrai o tempo de espera sugerido pelo Groq da mensagem de erro e aguarda exatamente esse intervalo antes de retentar (máximo de 6 tentativas com backoff exponencial).
 
 ---
 
 ## Stack Tecnológica
 
-| Camada | Tecnologia |
-|---|---|
-| Linguagem | Python 3.11+ |
-| Interface gráfica | Streamlit |
-| Chamadas LLM | Agno |
-| Providers LLM | Groq · OpenRouter |
-| Visualização | Plotly · Altair |
-| Gerenciamento de deps | uv |
-| Testes | pytest · pytest-cov |
-| Paradigma | Programação Funcional (funções puras, imutabilidade, lazy eval) |
+| Camada | Tecnologia | Versão |
+|---|---|---|
+| Linguagem | Python | ≥ 3.11 |
+| Interface gráfica | Streamlit | ≥ 1.57 |
+| Visualização | Plotly | ≥ 6.7 |
+| Chamadas LLM | Groq SDK | ≥ 1.2 |
+| Framework LLM | Agno | ≥ 2.6 |
+| Variáveis de ambiente | python-dotenv | ≥ 1.2 |
+| Gerenciamento de deps | uv | — |
+| Testes | pytest + pytest-cov | ≥ 9.0 |
+| Paradigma | Programação Funcional | funções puras · imutabilidade · lazy eval · composição |
+
+---
+
+## Testes
+
+```bash
+# Executar todos os testes
+uv run pytest tests/
+
+# Com relatório de cobertura
+uv run pytest tests/ --cov=core --cov-report=term-missing
+
+# Executar apenas os testes de transformações
+uv run pytest tests/transforms/
+
+# Executar um módulo específico
+uv run pytest tests/test_normalizing.py -v
+```
+
+A suíte de testes cobre as funções puras do `core/` (cleaning, filtering, normalizing, aggregations, pipeline) e as integrações de services (storage, classifiers, hashing, memoization).
 
 ---
 
 ## Equipe
 
-**Grupo 06 — Disciplina de Programação Funcional**
+**Grupo 06 — Residência em Programação III — Escola Politécnica de Pernambuco**
 
 | Membro | GitHub |
 |---|---|
@@ -362,10 +505,10 @@ O sistema também aceita qualquer arquivo CSV ou JSON Lines com os campos mínim
 | Luiz Hermano | [@LuizHerm](https://github.com/LuizHerm) |
 | Rafael Lopes | [@rjnlopes03](https://github.com/rjnlopes03) |
 
-> Professores colaboradores: [@paulosevero](https://github.com/paulosevero) · [@sequincozes](https://github.com/sequincozes)
+> Professores orientadores: [@paulosevero](https://github.com/paulosevero) · [@sequincozes](https://github.com/sequincozes)
 
 ---
 
 <p align="center">
-  Desenvolvido como projeto acadêmico · Grupo 06
+  Desenvolvido como projeto acadêmico · Grupo 06 · Escola Politécnica de Pernambuco
 </p>
