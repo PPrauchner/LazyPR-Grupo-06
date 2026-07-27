@@ -54,7 +54,9 @@ _Avoid_: tipo de PR, categoria da mudança
 
 **Clareza da Descrição**:
 Quão bem escrito e compreensível é o texto analisado, numa escala ordinal de
-insuficiente a excelente. É a métrica de qualidade da contribuição.
+insuficiente a excelente. É a métrica de qualidade da contribuição. O texto
+julgado é o corpo do Comentário de Revisão, lido ao lado do trecho de código a
+que ele se refere — um comentário curto e certeiro é claro, não insuficiente.
 _Avoid_: qualidade, legibilidade, score
 
 ### O processamento
@@ -65,11 +67,20 @@ registros. O analista ativa ou desativa etapas sem que o código mude.
 _Avoid_: fluxo, processo, workflow
 
 **Etapa**:
-Uma transformação isolada dentro do Pipeline — limpeza, normalização, filtragem,
-classificação. Cada etapa recebe e devolve um stream.
+Uma transformação isolada dentro do Pipeline — limpeza, normalização,
+classificação. Cada etapa recebe e devolve um stream, e o Analista escolhe quais
+aplicar.
 _Avoid_: fase, passo, step
+
+**Filtro de Visualização**:
+Recorte que o Analista aplica sobre uma Análise já pronta, para focar um
+segmento. **Não** é Etapa: não participa do Pipeline e não altera o que foi
+persistido — a mesma Análise sustenta todos os recortes.
+_Avoid_: filtro, filtragem, etapa de filtragem
 
 **Análise**:
 O conjunto de resultados enriquecidos produzido a partir de um dataset. É o que
 se persiste para não recomputar: uma vez analisado, um dataset não volta ao LLM.
+Cobre sempre o dataset **inteiro** — um recorte é Filtro de Visualização, nunca
+uma Análise.
 _Avoid_: resultado, processamento, execução
