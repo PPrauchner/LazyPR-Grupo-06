@@ -44,6 +44,19 @@ uv run black .                                 # formatar
 Não há CI (`.github/workflows/` não existe) nem etapa de build — o app roda
 direto do fonte.
 
+### Branches
+
+`dev` é a branch de integração e o **default do repositório**: todo PR tem `dev`
+como base, e toda branch nova parte dela.
+
+```bash
+git checkout dev && git pull
+git checkout -b <tipo>/<descricao-curta>
+```
+
+`main` guarda o histórico estável e só recebe merge a partir de `dev`. Não abrir
+PR contra `main` nem partir branch dela.
+
 ---
 
 ## 3. Princípios de codificação (mandatórios)
