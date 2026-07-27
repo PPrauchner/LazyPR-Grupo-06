@@ -1,0 +1,30 @@
+{
+  "env": {
+    "GRILL_LOG": "on",
+    "BOARD_SYNC": "on",
+    "PR_REVIEW_PARALLEL": "on"
+  },
+  "hooks": {
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash .claude/hooks/stop-commit-reminder.sh"
+          }
+        ]
+      }
+    ],
+    "UserPromptExpansion": [
+      {
+        "matcher": "grill-(me|with-docs)",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash .claude/hooks/grill-log.sh"
+          }
+        ]
+      }
+    ]
+  }
+}
