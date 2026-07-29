@@ -42,7 +42,6 @@ def test_pipeline_applies_cleaning():
     config = PipelineConfig(
         enable_cleaning=True,
         enable_normalization=False,
-        enable_filtering=False,
         enable_classification=False,
     )
 
@@ -88,7 +87,6 @@ def test_pipeline_without_cleaning():
     config = PipelineConfig(
         enable_cleaning=False,
         enable_normalization=False,
-        enable_filtering=False,
         enable_classification=False,
     )
 
@@ -130,7 +128,6 @@ def test_pipeline_is_lazy():
     config = PipelineConfig(
         enable_cleaning=True,
         enable_normalization=False,
-        enable_filtering=False,
         enable_classification=False,
     )
 
