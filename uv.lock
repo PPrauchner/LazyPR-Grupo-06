@@ -580,6 +580,7 @@ dependencies = [
     { name = "agno" },
     { name = "groq" },
     { name = "plotly" },
+    { name = "pydantic" },
     { name = "python-dotenv" },
     { name = "streamlit" },
 ]
@@ -595,6 +596,7 @@ requires-dist = [
     { name = "agno", specifier = ">=2.6.5" },
     { name = "groq", specifier = ">=1.2.0" },
     { name = "plotly", specifier = ">=6.7.0" },
+    { name = "pydantic", specifier = ">=2.13" },
     { name = "python-dotenv", specifier = ">=1.2.2" },
     { name = "streamlit", specifier = ">=1.57.0" },
 ]
