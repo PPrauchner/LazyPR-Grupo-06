@@ -29,7 +29,7 @@ volumosos de forma *lazy*, classifica cada PR e apresenta dashboards Streamlit.
 | Gerenciador | **uv** (`uv.lock` — nunca usar pip/poetry) |
 | Interface | Streamlit |
 | Visualização | Plotly |
-| LLM | Groq SDK (`llama-3.1-8b-instant`) |
+| LLM | Agno + backend Groq (`llama-3.1-8b-instant`) |
 | Formatação | Black, `line-length = 88` |
 | Testes | pytest + pytest-cov |
 
@@ -389,10 +389,11 @@ são dívida a aceitar.
 8. **Dois nomes para compor predicados** — `compose_predicates()` e
    `build_filter()` coexistem em `core/transforms/filtering.py`.
 
-9. **Dica 05 não atendida** — `agno>=2.6.5` está no `pyproject.toml` mas não é
-   importado por módulo nenhum; a classificação usa o SDK do Groq direto. É
-   *Dica de Implementação*, não Regra: não é não-conformidade. Correção
-   pretendida pelo grupo.
+9. ~~**Dica 05 não atendida**~~ — resolvida: `services/llm_client.py` chama o LLM
+   por um `Agent` do Agno com backend Groq e `output_schema` Pydantic
+   ([ADR-0004](./docs/adr/0004-migracao-das-chamadas-de-llm-para-agno.md)). O
+   throttle de 2,1 s e o backoff continuam em `_invoke_with_retry`, fora do Agno.
+   `groq` permanece declarado porque o Agno depende dele internamente.
 
 ### Conforme
 
