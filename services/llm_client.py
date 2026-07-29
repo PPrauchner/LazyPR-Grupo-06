@@ -30,9 +30,8 @@ import os
 import re
 import time
 import itertools
-import functools
 import logging
-from typing import Generator, Iterator
+from typing import Generator, Iterator, Literal, Type
 from dotenv import load_dotenv
 
 load_dotenv()
@@ -40,9 +39,12 @@ load_dotenv()
 logger = logging.getLogger(__name__)
 
 try:
-    from groq import Groq
+    from agno.agent import Agent
+    from agno.models.groq import Groq as GroqModel
 except ImportError as exc:
-    raise ImportError("Groq não está instalado. Execute: uv add groq") from exc
+    raise ImportError("Agno não está instalado. Execute: uv add agno") from exc
+
+from pydantic import BaseModel
 
 from core.models.pr_record import PRRecord
 
@@ -53,7 +55,47 @@ from core.models.pr_record import PRRecord
 _MAX_RETRIES: int = 6
 _BACKOFF_FACTOR: float = 2.0
 
+# Throttle: o plano gratuito do Groq limita 30 RPM → 1 requisição a cada 2 s
+# mais margem de segurança (≤ 28 RPM).
+_THROTTLE_SECONDS: float = 2.1
+
 _DEFAULT_MODEL = "llama-3.1-8b-instant"
+
+# ---------------------------------------------------------------------------
+# Schemas de saída — vivem em services/ para que core/ não ganhe nenhum
+# import novo (Regra Geral 06 / Regra Específica 02).
+# ---------------------------------------------------------------------------
+
+ProjectTypeValue = Literal["library", "web_app", "framework", "cli", "other"]
+PRNatureValue = Literal[
+    "bug_fix", "feature", "refactoring", "documentation", "other"
+]
+ClarityLevelValue = Literal["insufficient", "basic", "good", "excellent"]
+
+
+class ProjectTypeOutput(BaseModel):
+    """Saída estruturada da classificação de tipo de projeto."""
+
+    project_type: ProjectTypeValue
+
+
+class PRNatureOutput(BaseModel):
+    """Saída estruturada da classificação de natureza da contribuição."""
+
+    pr_nature: PRNatureValue
+
+
+class ClarityOutput(BaseModel):
+    """Saída estruturada da avaliação de clareza da descrição."""
+
+    clarity_level: ClarityLevelValue
+
+
+class PRNatureAndClarityOutput(BaseModel):
+    """Saída estruturada da chamada unificada natureza + clareza."""
+
+    pr_nature: PRNatureValue
+    clarity_level: ClarityLevelValue
 
 # ---------------------------------------------------------------------------
 # Helpers privados
@@ -77,15 +119,25 @@ def _parse_retry_after(error_message: str, default: float = 5.0) -> float:
     return float(match.group(1)) + 1.0 if match else default
 
 
-def _build_client(api_key: str | None) -> Groq:
+def _build_agent(
+    api_key: str | None,
+    model: str,
+    output_schema: Type[BaseModel],
+) -> Agent:
     """
-    Factory que constrói o cliente Groq.
+    Factory que constrói o agente Agno com backend Groq.
+
+    O retry e o throttle **não** são delegados ao Agno (`retries=0`): o
+    controle de rate limit pertence a `_invoke_with_retry`, porque um
+    throttle quebrado não falha em teste — falha com 429 em produção.
 
     Args:
         api_key: Chave de autenticação lida do ambiente.
+        model: Identificador do modelo Groq a ser utilizado.
+        output_schema: Schema Pydantic que o Agno deve validar na resposta.
 
     Returns:
-        Instância de Groq pronta para invocar o modelo.
+        Instância de Agent pronta para invocar o modelo.
 
     Raises:
         ValueError: Se a chave de API não estiver definida.
@@ -95,7 +147,12 @@ def _build_client(api_key: str | None) -> Groq:
             "GROQ_API_KEY não está definida. "
             "Adicione a variável ao arquivo .env antes de executar."
         )
-    return Groq(api_key=api_key)
+    return Agent(
+        model=GroqModel(id=model, api_key=api_key),
+        output_schema=output_schema,
+        retries=0,
+        telemetry=False,
+    )
 
 
 def _format_record(
@@ -175,10 +232,8 @@ def _build_prompt(
         [
             "You are an AI assistant classifying the type of a GitHub software project.",
             "You will receive metadata from Pull Request comments of the *same* repository.",
-            "Infer the project type and return ONLY a JSON object with a single key.",
+            "Infer the project type of the repository.",
             "Valid values for 'project_type': 'library', 'web_app', 'framework', 'cli', 'other'.",
-            "Return ONLY the JSON object. No explanations, no markdown, no extra text.",
-            'Example: {"project_type": "library"}',
         ]
     )
 
@@ -202,27 +257,29 @@ def _build_prompt(
 
 
 def _invoke_with_retry(
-    client: Groq,
-    model: str,
+    agent: Agent,
     prompt: str,
     max_retries: int = _MAX_RETRIES,
     backoff: float = _BACKOFF_FACTOR,
-) -> str:
+) -> BaseModel:
     """
-    Invoca o cliente LLM com retry e backoff exponencial.
+    Invoca o agente Agno com throttle, retry e backoff exponencial.
+
+    Esta função — e não o Agno — é a dona do controle de rate limit: aplica
+    o throttle antes de cada requisição, respeita o tempo sugerido em erros
+    429 e recua exponencialmente nas demais falhas.
 
     Laço justificado: retry de I/O de rede é inerentemente imperativo
     e pertence exclusivamente à camada services/.
 
     Args:
-        client: Instância do Groq já configurada.
-        model: Identificador do modelo a ser utilizado.
+        agent: Instância de Agent do Agno já configurada com output_schema.
         prompt: Prompt completo a ser enviado.
         max_retries: Número máximo de tentativas.
         backoff: Fator base para o backoff exponencial em segundos.
 
     Returns:
-        Resposta bruta do LLM como string.
+        Instância do schema Pydantic validada pelo Agno.
 
     Raises:
         ValueError: Se todas as tentativas falharem ou retornarem vazio.
@@ -232,16 +289,13 @@ def _invoke_with_retry(
     # Laço justificado: retry de I/O de rede (services/)
     for attempt in range(max_retries):
         try:
-            # Throttle: Groq free tier limita 30 RPM → 1 req a cada 2s + margem de segurança
-            time.sleep(2.1)
-            response = client.chat.completions.create(
-                model=model,
-                messages=[{"role": "user", "content": prompt}],
-            )
-            result = response.choices[0].message.content
-            if not result:
+            # Throttle obrigatório antes de cada requisição (30 RPM no plano free)
+            time.sleep(_THROTTLE_SECONDS)
+            result = agent.run(prompt).content
+            if not hasattr(result, "model_dump_json"):
                 raise ValueError(
-                    f"LLM retornou resposta vazia na tentativa {attempt + 1}."
+                    f"LLM retornou resposta vazia ou não estruturada na "
+                    f"tentativa {attempt + 1}."
                 )
             return result
         except Exception as exc:
@@ -292,14 +346,14 @@ def classify_project_type_batch(records: tuple[PRRecord, ...]) -> str:
 
     # Configurações lidas dentro do escopo da função — sem estado global
     api_key = os.getenv("GROQ_API_KEY")
-    model = "llama-3.1-8b-instant"
+    model = _DEFAULT_MODEL
     logger.debug(f"Usando modelo LLM: {model} para classify_project_type_batch")
     max_chars = int(os.getenv("LAZYPR_MAX_BODY_CHARS", "1500"))
 
-    client = _build_client(api_key)
+    agent = _build_agent(api_key, model, ProjectTypeOutput)
     prompt = _build_prompt(records, max_chars)
 
-    return _invoke_with_retry(client=client, model=model, prompt=prompt)
+    return _invoke_with_retry(agent=agent, prompt=prompt).model_dump_json()
 
 
 def classify_pr_nature_single(record: PRRecord) -> str:
@@ -328,19 +382,17 @@ def classify_pr_nature_single(record: PRRecord) -> str:
         "You are an AI assistant classifying the nature of a GitHub Pull Request.\n"
         "Analyze the PR description and determine its nature.\n"
         "Valid values for 'pr_nature': 'bug_fix', 'feature', 'refactoring', 'documentation', 'other'.\n"
-        "Return ONLY a JSON object with a single key. No explanations, no markdown.\n"
-        'Example: {"pr_nature": "feature"}\n'
         f"\nRepository: {record.repo}\n"
         f"Path: {record.path[:100]}\n"
         f"PR Description: {record.body[:1000]}\n"
     )
 
     api_key = os.getenv("GROQ_API_KEY")
-    model = "llama-3.1-8b-instant"
+    model = _DEFAULT_MODEL
     logger.debug(f"Usando modelo LLM: {model} para classify_pr_nature_single")
 
-    client = _build_client(api_key)
-    return _invoke_with_retry(client=client, model=model, prompt=prompt)
+    agent = _build_agent(api_key, model, PRNatureOutput)
+    return _invoke_with_retry(agent=agent, prompt=prompt).model_dump_json()
 
 
 def classify_clarity_single(record: PRRecord) -> str:
@@ -368,18 +420,16 @@ def classify_clarity_single(record: PRRecord) -> str:
         "Assess the PR description and determine its clarity level.\n"
         "Valid values for 'clarity_level': 'insufficient', 'basic', 'good', 'excellent'.\n"
         "Consider: presence of context, problem statement, solution explanation, and examples.\n"
-        "Return ONLY a JSON object with a single key. No explanations, no markdown.\n"
-        'Example: {"clarity_level": "good"}\n'
         f"\nRepository: {record.repo}\n"
         f"PR Description: {record.body[:1000]}\n"
     )
 
     api_key = os.getenv("GROQ_API_KEY")
-    model = "llama-3.1-8b-instant"
+    model = _DEFAULT_MODEL
     logger.debug(f"Usando modelo LLM: {model} para classify_clarity_single")
 
-    client = _build_client(api_key)
-    return _invoke_with_retry(client=client, model=model, prompt=prompt)
+    agent = _build_agent(api_key, model, ClarityOutput)
+    return _invoke_with_retry(agent=agent, prompt=prompt).model_dump_json()
 
 
 def classify_pr_nature_and_clarity_single(record: PRRecord) -> str:
@@ -404,19 +454,19 @@ def classify_pr_nature_and_clarity_single(record: PRRecord) -> str:
 
     prompt = (
         "You are an AI assistant classifying a GitHub Pull Request.\n"
-        "Analyze the PR description and return ONLY a JSON object with exactly two keys.\n"
+        "Analyze the PR description and classify both its nature and its clarity.\n"
         "Valid values for 'pr_nature': 'bug_fix', 'feature', 'refactoring', 'documentation', 'other'.\n"
         "Valid values for 'clarity_level': 'insufficient', 'basic', 'good', 'excellent'.\n"
-        "Return ONLY the JSON object. No explanations, no markdown, no extra text.\n"
-        'Example: {"pr_nature": "feature", "clarity_level": "good"}\n'
         f"\nRepository: {record.repo}\n"
         f"Path: {record.path[:100]}\n"
         f"PR Description: {record.body[:1000]}\n"
     )
 
     api_key = os.getenv("GROQ_API_KEY")
-    model = "llama-3.1-8b-instant"
-    logger.debug(f"Usando modelo LLM: {model} para classify_pr_nature_and_clarity_single")
+    model = _DEFAULT_MODEL
+    logger.debug(
+        f"Usando modelo LLM: {model} para classify_pr_nature_and_clarity_single"
+    )
 
-    client = _build_client(api_key)
-    return _invoke_with_retry(client=client, model=model, prompt=prompt)
+    agent = _build_agent(api_key, model, PRNatureAndClarityOutput)
+    return _invoke_with_retry(agent=agent, prompt=prompt).model_dump_json()
