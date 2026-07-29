@@ -42,7 +42,10 @@ def render_export_page(records=None) -> None:
         st.stop()
         return
 
-    results = tuple(st.session_state["analysis_results"])
+    # Recebe a Análise já recortada pelo Filtro de Visualização (ADR 0003);
+    # ler st.session_state aqui exportaria o conjunto inteiro, ignorando a
+    # sidebar.
+    results = tuple(records or ())
 
     st.subheader("Resumo do Arquivo")
 

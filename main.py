@@ -39,7 +39,12 @@ from views.export import (
 )
 
 from ui.sidebar_filters import (
+    get_active_filters,
     render_sidebar,
+)
+
+from core.transforms.filtering import (
+    apply_filters,
 )
 
 st.set_page_config(
@@ -65,12 +70,23 @@ initialize_theme()
 
 apply_theme()
 
-records = st.session_state.get(
+analysis = st.session_state.get(
     "analysis_results",
     (),
 )
 
 filters = render_sidebar()
+
+# Filtro de Visualização (ADR 0003): recorta a Análise já carregada, depois de
+# a sidebar ter renderizado os widgets. Aplicado aqui, no roteamento, para que
+# toda página receba o mesmo recorte — e o conjunto completo quando os filtros
+# são limpos, inclusive num dataset servido do cache.
+records = tuple(
+    apply_filters(
+        (get_active_filters(),),
+        analysis,
+    )
+)
 
 if "page_override" in st.session_state:
 
