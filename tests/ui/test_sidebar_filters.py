@@ -107,7 +107,6 @@ def test_get_active_filters_with_language_selection(mock_st, sample_analysis_res
         "selected_clarity": (),
         "use_date_filter": False,
     }
-    mock_st.session_state.get = mock_st.session_state.__getitem__
 
     predicate = get_active_filters()
 
@@ -135,7 +134,6 @@ def test_get_active_filters_with_clarity_selection(mock_st, sample_analysis_resu
         "selected_clarity": ("good", "excellent"),
         "use_date_filter": False,
     }
-    mock_st.session_state.get = mock_st.session_state.__getitem__
 
     predicate = get_active_filters()
 
@@ -161,7 +159,6 @@ def test_get_active_filters_with_project_type_selection(
         "selected_clarity": (),
         "use_date_filter": False,
     }
-    mock_st.session_state.get = mock_st.session_state.__getitem__
 
     predicate = get_active_filters()
 
@@ -187,7 +184,6 @@ def test_get_active_filters_with_pr_nature_selection(
         "selected_clarity": (),
         "use_date_filter": False,
     }
-    mock_st.session_state.get = mock_st.session_state.__getitem__
 
     predicate = get_active_filters()
 
@@ -212,7 +208,6 @@ def test_get_active_filters_with_multiple_criteria(mock_st, sample_analysis_resu
         "selected_clarity": ("good",),
         "use_date_filter": False,
     }
-    mock_st.session_state.get = mock_st.session_state.__getitem__
 
     predicate = get_active_filters()
 
@@ -243,7 +238,6 @@ def test_get_active_filters_with_no_filters_returns_identity(mock_st):
         "selected_clarity": (),
         "use_date_filter": False,
     }
-    mock_st.session_state.get = mock_st.session_state.__getitem__
 
     predicate = get_active_filters()
 
@@ -286,7 +280,6 @@ def test_get_active_filters_with_date_filter_missing_dates(mock_st):
         "start_date": None,
         "end_date": None,
     }
-    mock_st.session_state.get = mock_st.session_state.__getitem__
 
     predicate = get_active_filters()
 
