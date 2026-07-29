@@ -63,6 +63,13 @@ def test_has_project_type():
     assert predicate(MockResult(project_type="framework")) is False
 
 
+def test_has_project_type_with_none_project_type():
+    """Registro sem classificação de tipo de projeto nunca satisfaz o predicado."""
+    predicate = has_project_type("biblioteca")
+
+    assert predicate(MockResult(project_type=None)) is False
+
+
 def test_has_pr_nature():
     predicate = has_pr_nature("bug_fix")
 
