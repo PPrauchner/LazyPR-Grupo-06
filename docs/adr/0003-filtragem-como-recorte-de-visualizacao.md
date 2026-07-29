@@ -40,3 +40,14 @@ nunca lidos de estado global. `core/` deixa de importar `ui/`.
 O `CONTEXT.md` foi ajustado: **Etapa** não lista mais filtragem, **Análise** passa
 a dizer que cobre sempre o dataset inteiro, e **Filtro de Visualização** entrou
 como termo próprio.
+
+## Reprocessamento das Análises truncadas
+
+As Análises gravadas antes desta correção podem estar recortadas, e nada no
+arquivo distingue uma truncada de uma completa. Em vez de pedir que alguém apague
+`.cache` à mão, `services/storage.py` passa a versionar a chave de cache
+(`CACHE_SCHEMA_VERSION = "v2"`, prefixo do nome do arquivo): toda Análise antiga
+dá **miss** e é reanalisada na primeira vez que o dataset for submetido de novo.
+Nenhuma ação humana é necessária, e os arquivos antigos ficam inertes em disco —
+podem ser apagados a qualquer momento. Correções futuras que invalidem o formato
+seguem o mesmo caminho: incrementar a versão.
