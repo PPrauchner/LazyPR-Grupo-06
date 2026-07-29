@@ -180,7 +180,7 @@ class TestSaveAndLoadResults:
         storage.save_results(repo_hash, [result])
 
         # Lê arquivo diretamente
-        cache_path = storage._get_cache_dir() / f"{repo_hash}.json"
+        cache_path = storage._cache_path(repo_hash)
         with open(cache_path, "r") as f:
             data = json.load(f)
         assert isinstance(data, list)
@@ -213,8 +213,8 @@ class TestSaveAndLoadResults:
 
         cache_dir = storage._get_cache_dir()
         # Verifica que arquivo final existe mas temporário não
-        assert (cache_dir / f"{repo_hash}.json").exists()
-        assert not (cache_dir / f"{repo_hash}.tmp.json").exists()
+        assert storage._cache_path(repo_hash).exists()
+        assert not storage._cache_path(repo_hash, suffix="tmp.json").exists()
         
 class TestStorageEdgeCases:
     
@@ -222,7 +222,7 @@ class TestStorageEdgeCases:
     def test_load_corrupted_json_returns_empty(self, temp_cache_dir):
         """load_results() ignora arquivos com JSON malformado e retorna gerador vazio."""
         repo_hash = "corrupted_json_test"
-        cache_path = storage._get_cache_dir() / f"{repo_hash}.json"
+        cache_path = storage._cache_path(repo_hash)
         
         # Cria um arquivo com JSON inválido intencionalmente
         with open(cache_path, "w", encoding="utf-8") as f:
@@ -235,7 +235,7 @@ class TestStorageEdgeCases:
     def test_load_invalid_schema_returns_empty(self, temp_cache_dir):
         """load_results() trata TypeError ao instanciar AnalysisResult com dados incompletos."""
         repo_hash = "invalid_schema_test"
-        cache_path = storage._get_cache_dir() / f"{repo_hash}.json"
+        cache_path = storage._cache_path(repo_hash)
         
         # JSON válido, mas não possui os atributos necessários para AnalysisResult
         with open(cache_path, "w", encoding="utf-8") as f:
@@ -251,7 +251,7 @@ class TestStorageEdgeCases:
         cache_dir = storage._get_cache_dir()
         
         # Cria um diretório com o mesmo nome que o arquivo de cache teria
-        fake_file_dir = cache_dir / f"{repo_hash}.json"
+        fake_file_dir = storage._cache_path(repo_hash)
         fake_file_dir.mkdir(parents=True, exist_ok=True)
 
         # Deve retornar False pois o método exige is_file()

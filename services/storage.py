@@ -38,6 +38,17 @@ from typing import Generator
 from core.models.analysis_result import AnalysisResult
 
 
+# Versão do esquema da Análise persistida. Trocar este valor invalida todo o
+# cache existente: a Análise passa a ser gravada e procurada sob outro nome de
+# arquivo, e as antigas simplesmente dão miss e são reprocessadas sozinhas.
+#
+# "v2" invalida as Análises gravadas antes da issue #82, quando os filtros da
+# sidebar podiam recortar o stream antes da persistência — uma Análise truncada
+# ficava indistinguível de uma completa. Reprocessar não exige ação humana:
+# basta subir o dataset de novo, que ele será analisado por inteiro.
+CACHE_SCHEMA_VERSION = "v2"
+
+
 def _get_cache_dir() -> Path:
     """Obtém o diretório de cache configurável.
 
@@ -50,6 +61,20 @@ def _get_cache_dir() -> Path:
     return Path(cache_dir)
 
 
+def _cache_path(repo_hash: str, suffix: str = "json") -> Path:
+    """Monta o caminho versionado do arquivo de cache de uma Análise.
+
+    Args:
+        repo_hash: Hash SHA-256 único do dataset.
+        suffix: Extensão do arquivo ("json" para o definitivo, "tmp.json"
+            para o temporário da escrita atômica).
+
+    Returns:
+        Caminho do arquivo, prefixado pela versão do esquema de cache.
+    """
+    return _get_cache_dir() / f"{CACHE_SCHEMA_VERSION}-{repo_hash}.{suffix}"
+
+
 def has_cached_analysis(repo_hash: str) -> bool:
     """Verifica se análise já foi persistida para um repositório.
 
@@ -59,7 +84,7 @@ def has_cached_analysis(repo_hash: str) -> bool:
     Returns:
         True se arquivo de cache existe e é válido, False caso contrário.
     """
-    cache_path = _get_cache_dir() / f"{repo_hash}.json"
+    cache_path = _cache_path(repo_hash)
     return cache_path.exists() and cache_path.is_file()
 
 
@@ -75,7 +100,7 @@ def load_results(repo_hash: str) -> Generator[AnalysisResult, None, None]:
     Yields:
         AnalysisResult reconstituído do arquivo JSON.
     """
-    cache_path = _get_cache_dir() / f"{repo_hash}.json"
+    cache_path = _cache_path(repo_hash)
 
     if not cache_path.exists():
         return
@@ -106,8 +131,8 @@ def save_results(repo_hash: str, results: list[AnalysisResult]) -> None:
     cache_dir = _get_cache_dir()
     cache_dir.mkdir(parents=True, exist_ok=True)
 
-    cache_path = cache_dir / f"{repo_hash}.json"
-    temp_path = cache_dir / f"{repo_hash}.tmp.json"
+    cache_path = _cache_path(repo_hash)
+    temp_path = _cache_path(repo_hash, suffix="tmp.json")
 
     serialized = [result._asdict() for result in results]
 
