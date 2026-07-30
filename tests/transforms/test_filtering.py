@@ -57,15 +57,16 @@ def test_is_language():
 
 
 def test_has_project_type():
-    predicate = has_project_type("biblioteca")
+    predicate = has_project_type("library")
 
-    assert predicate(MockResult(project_type="biblioteca")) is True
+    assert predicate(MockResult(project_type="library")) is True
     assert predicate(MockResult(project_type="framework")) is False
+    assert predicate(MockResult(project_type="unknown")) is False
 
 
 def test_has_project_type_with_none_project_type():
     """Registro sem classificação de tipo de projeto nunca satisfaz o predicado."""
-    predicate = has_project_type("biblioteca")
+    predicate = has_project_type("library")
 
     assert predicate(MockResult(project_type=None)) is False
 
@@ -78,14 +79,16 @@ def test_has_pr_nature():
 
 
 def test_has_clarity_level():
-    predicate = has_clarity_level("excelente")
+    predicate = has_clarity_level("excellent")
 
-    assert predicate(MockResult(clarity_level="excelente")) is True
-    assert predicate(MockResult(clarity_level="insuficiente")) is False
+    assert predicate(MockResult(clarity_level="excellent")) is True
+    assert predicate(MockResult(clarity_level="insufficient")) is False
 
 
 def test_is_in_date_range():
-    predicate = is_in_date_range("2025-01-01", "2025-12-31")
+    # A comparação é lexicográfica sobre a string ISO-8601, então o limite
+    # superior precisa incluir a hora para abranger o último dia inteiro.
+    predicate = is_in_date_range("2025-01-01", "2025-12-31T23:59:59Z")
 
     # Dentro do intervalo
     assert predicate(MockResult(created_at="2025-06-15T10:00:00Z")) is True
