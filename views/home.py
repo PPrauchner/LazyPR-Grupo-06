@@ -20,31 +20,6 @@ def render_home(records) -> None:
 
     theme = get_theme()
 
-    stats = st.session_state.get(
-        "pipeline_stats",
-        {},
-    )
-
-    loaded = stats.get(
-        "loaded",
-        0,
-    )
-
-    cleaned = stats.get(
-        "cleaned",
-        0,
-    )
-
-    normalized = stats.get(
-        "normalized",
-        0,
-    )
-
-    classified = stats.get(
-        "classified",
-        0,
-    )
-
     st.markdown(
         f"""
         <div
