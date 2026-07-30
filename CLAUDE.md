@@ -268,6 +268,12 @@ Regras invioláveis:
   repositórios **não** colidem.
 - Após cache hit, `language` e `created_at` são **sempre** sobrescritos com os
   valores do `PRRecord` atual — não podem congelar no cache.
+- O disco tem **dois espaços de nomes** sob `CACHE_DIR`, em subdiretórios
+  separados e com versão de esquema própria: `analysis/` (a Análise do dataset,
+  `CACHE_SCHEMA_VERSION`) e `repo-classification/` (as classificações de LLM por
+  repositório, `REPO_CLASSIFICATION_SCHEMA_VERSION`). Versionar um **não**
+  invalida o outro — ver
+  [ADR-0003](./docs/adr/0003-filtragem-como-recorte-de-visualizacao.md).
 
 ### Rate limit do Groq
 

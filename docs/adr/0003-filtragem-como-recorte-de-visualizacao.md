@@ -51,3 +51,23 @@ dá **miss** e é reanalisada na primeira vez que o dataset for submetido de nov
 Nenhuma ação humana é necessária, e os arquivos antigos ficam inertes em disco —
 podem ser apagados a qualquer momento. Correções futuras que invalidem o formato
 seguem o mesmo caminho: incrementar a versão.
+
+### Escopo do versionamento: só a Análise (issue #101)
+
+O `CACHE_SCHEMA_VERSION` invalida **apenas a Análise do dataset**. As
+classificações de LLM por repositório, gravadas por
+`utils/memoization.py::cached_classify()`, nunca estiveram truncadas — o Filtro
+de Visualização recortava o stream depois delas — e descartá-las junto custaria
+cota do Groq à toa, contra a Regra Geral 04.
+
+Os dois caches passam a ocupar **subdiretórios distintos** de `CACHE_DIR`
+(`analysis/` e `repo-classification/`), cada um com a própria versão de esquema
+(`CACHE_SCHEMA_VERSION` e `REPO_CLASSIFICATION_SCHEMA_VERSION`). Escolhemos
+subdiretório em vez de sufixo na chave porque separa também fisicamente: dá para
+apagar um cache inteiro à mão sem tocar no outro. Um bump futuro atinge só o
+espaço afetado.
+
+A escrita permanece atômica (`.tmp` + `os.replace`) nos dois espaços, agora com
+o `mkdir` do subdiretório do namespace. A mudança de layout invalida uma vez os
+arquivos que estavam na raiz de `CACHE_DIR`; daí em diante, cada espaço evolui
+sozinho.
