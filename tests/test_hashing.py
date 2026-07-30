@@ -7,7 +7,7 @@ Testes unitários para módulo de hashing.
 import pytest
 import io
 from core.models.pr_record import PRRecord
-from utils.hashing import hash_content, hash_record,hash_file_stream
+from utils.hashing import hash_content, hash_record, hash_file_stream
 
 
 class TestHashContent:
@@ -118,8 +118,8 @@ class TestHashRecord:
         hash_result = hash_record(pr)
         assert len(hash_result) == 64
 
+
 class TestHashFileStream:
-    
 
     def test_hash_file_stream_correctness(self):
         """Calcula o hash corretamente em chunks e garante a reconstrução das linhas via generator."""
@@ -140,22 +140,26 @@ class TestHashFileStream:
         """Garante que um stream vazio gera o hash correto para string vazia e um gerador vazio."""
         stream_vazio = io.StringIO("")
         digest, gerador = hash_file_stream(stream_vazio)
-        
+
         assert list(gerador) == []
         assert digest == hash_content("")
-        
-class TestHashingEncodingResilience:
 
+
+class TestHashingEncodingResilience:
 
     def test_hash_content_with_emojis_and_special_chars(self):
         """Garante que a codificação UTF-8 forçada suporta Emojis, Cyrillic e acentuação."""
-        conteudo_complexo = "Bugfix no core 🐛. Alteração em repositório chinês (测试) e russo (тест)."
-        
+        conteudo_complexo = (
+            "Bugfix no core 🐛. Alteração em repositório chinês (测试) e russo (тест)."
+        )
+
         try:
             hash_result = hash_content(conteudo_complexo)
         except UnicodeEncodeError:
-            pytest.fail("hash_content falhou ao codificar caracteres especiais para UTF-8.")
-            
+            pytest.fail(
+                "hash_content falhou ao codificar caracteres especiais para UTF-8."
+            )
+
         assert len(hash_result) == 64
         assert isinstance(hash_result, str)
 
@@ -165,12 +169,12 @@ class TestHashingEncodingResilience:
         stream_simulado = io.StringIO(conteudo)
 
         digest, gerador = hash_file_stream(stream_simulado)
-        
+
         # Verifica se o gerador não corrompeu os caracteres na hora de reconstruir a string
         linhas = list(gerador)
         assert linhas[0] == "Primeira linha 🛠️\n"
         assert linhas[1] == "Segunda linha: áéíóú\n"
-        
+
         # O digest deve ser idêntico ao carregamento completo em memória
         assert digest == hash_content(conteudo)
 

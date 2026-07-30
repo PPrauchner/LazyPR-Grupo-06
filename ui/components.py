@@ -98,8 +98,8 @@ def metric_card(
 
 </div>
 """,
-    unsafe_allow_html=True,
-)
+        unsafe_allow_html=True,
+    )
 
 
 def chart_container_start() -> None:

@@ -90,12 +90,10 @@ records = tuple(
 
 if "page_override" in st.session_state:
 
- page = st.session_state.pop(
-        "page_override"
-    )
-else:   
-   page = filters["page"]
-   
+    page = st.session_state.pop("page_override")
+else:
+    page = filters["page"]
+
 if page == "🏠 Home":
 
     render_home(records)

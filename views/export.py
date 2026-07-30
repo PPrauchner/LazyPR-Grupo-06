@@ -24,6 +24,7 @@ import streamlit as st
 from core.aggregations.counters import count_by
 from ui.components import data_table, download_buttons, metric_card, status_banner
 
+
 def render_export_page(records=None) -> None:
     """
     Renderiza a página de exportação.

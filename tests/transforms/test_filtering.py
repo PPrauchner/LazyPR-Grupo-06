@@ -33,12 +33,13 @@ from core.transforms.filtering import (
     has_project_type,
     has_pr_nature,
     has_clarity_level,
-    build_filter
+    build_filter,
 )
 
 
 class MockResult(NamedTuple):
     """Mock imutável simulando AnalysisResult."""
+
     language: str = ""
     project_type: str = ""
     pr_nature: str = ""
@@ -53,7 +54,6 @@ def test_is_language():
     assert predicate(MockResult(language="Python")) is True
     assert predicate(MockResult(language="python")) is True
     assert predicate(MockResult(language="Java")) is False
-
 
 
 def test_has_project_type():
@@ -102,6 +102,7 @@ def test_is_in_date_range():
 
 # --- Testes das funções Base do PR ---
 
+
 def test_by_language_exact_match():
     predicate = by_language(("Python",))
     assert predicate(MockResult(language="Python")) is True
@@ -139,6 +140,7 @@ def test_by_clarity_level_multiple():
 
 # --- Testes de Composição Funcional (compose_predicates / build_filter) ---
 
+
 def test_compose_predicates_empty():
     predicate = compose_predicates([])
     assert predicate(MockResult()) is True
@@ -151,7 +153,7 @@ def test_build_filter_empty():
 
 def test_build_filter_composition():
     predicate = build_filter(is_language("Python"), has_pr_nature("bug_fix"))
-    
+
     assert predicate(MockResult(language="python", pr_nature="bug_fix")) is True
     assert predicate(MockResult(language="Python", pr_nature="feature")) is False
     assert predicate(MockResult(language="Java", pr_nature="bug_fix")) is False
@@ -168,6 +170,7 @@ def test_compose_predicates_generator_input():
 
 
 # --- Testes de Pipeline (apply_filters) ---
+
 
 def test_apply_filters_lazy_evaluation():
     predicates = [by_language(("Python",))]

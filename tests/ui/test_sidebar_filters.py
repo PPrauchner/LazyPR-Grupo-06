@@ -38,7 +38,7 @@ def sample_analysis_result():
 
 def test_clarity_levels_vocabulary_is_correct():
     """
-    Garante que o vocabulário do nível de clareza corresponda exatamente 
+    Garante que o vocabulário do nível de clareza corresponda exatamente
     ao que é gerado pela classificação.
     """
     expected_levels = ("excellent", "good", "basic", "insufficient")
@@ -55,20 +55,14 @@ def test_languages_vocabulary_not_empty():
 
 def test_project_types_vocabulary_not_empty():
     """Verifica que a lista de tipos de projeto não está vazia."""
-    assert (
-        len(PROJECT_TYPES) > 0
-    ), "PROJECT_TYPES deve conter pelo menos um tipo."
+    assert len(PROJECT_TYPES) > 0, "PROJECT_TYPES deve conter pelo menos um tipo."
     assert "Framework" in PROJECT_TYPES, "Framework deveria estar na lista."
 
 
 def test_pr_natures_vocabulary_not_empty():
     """Verifica que a lista de naturezas de PR não está vazia."""
-    assert (
-        len(PR_NATURES) > 0
-    ), "PR_NATURES deve conter pelo menos uma natureza."
-    assert (
-        "bug_fix" in PR_NATURES
-    ), "bug_fix deveria estar na lista de PR_NATURES."
+    assert len(PR_NATURES) > 0, "PR_NATURES deve conter pelo menos uma natureza."
+    assert "bug_fix" in PR_NATURES, "bug_fix deveria estar na lista de PR_NATURES."
 
 
 def test_pages_vocabulary_not_empty():
@@ -171,9 +165,7 @@ def test_get_active_filters_with_project_type_selection(
 
 
 @patch("ui.sidebar_filters.st")
-def test_get_active_filters_with_pr_nature_selection(
-    mock_st, sample_analysis_result
-):
+def test_get_active_filters_with_pr_nature_selection(mock_st, sample_analysis_result):
     """
     Testa que um predicado com filtro de natureza de PR funciona corretamente.
     """
