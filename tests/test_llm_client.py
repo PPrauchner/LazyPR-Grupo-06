@@ -17,7 +17,6 @@ import pytest
 
 from services import llm_client
 
-
 # ---------------------------------------------------------------------------
 # Dublês
 # ---------------------------------------------------------------------------
@@ -54,9 +53,7 @@ class FakeAgent:
 
     def run(self, prompt: str) -> FakeRunOutput:
         self.prompts.append(prompt)
-        outcome = (
-            self.scripted.pop(0) if len(self.scripted) > 1 else self.scripted[0]
-        )
+        outcome = self.scripted.pop(0) if len(self.scripted) > 1 else self.scripted[0]
         if isinstance(outcome, Exception):
             raise outcome
         return FakeRunOutput(outcome)
@@ -75,9 +72,7 @@ def use_fake_agent(monkeypatch):
     """Injeta um FakeAgent no lugar do agente Agno real."""
 
     def _install(agent: FakeAgent) -> FakeAgent:
-        monkeypatch.setattr(
-            llm_client, "_build_agent", lambda *args, **kwargs: agent
-        )
+        monkeypatch.setattr(llm_client, "_build_agent", lambda *args, **kwargs: agent)
         return agent
 
     monkeypatch.setenv("GROQ_API_KEY", "test-key")
@@ -106,9 +101,7 @@ def test_classify_project_type_batch_returns_json_from_agno(
 # ---------------------------------------------------------------------------
 
 
-def test_throttle_precedes_every_request(
-    sample_pr, use_fake_agent, recorded_sleeps
-):
+def test_throttle_precedes_every_request(sample_pr, use_fake_agent, recorded_sleeps):
     """Cada requisição é precedida por uma pausa de 2,1 s.
 
     Falha se alguém remover ou encurtar o throttle: o 429 no meio de uma
@@ -156,6 +149,95 @@ def test_rate_limit_error_honors_suggested_wait(
     assert json.loads(raw) == {"project_type": "library"}
     assert len(agent.prompts) == 2
     assert recorded_sleeps == [2.1, 8.0, 2.1]
+
+
+# ---------------------------------------------------------------------------
+# Desvio de schema — orçamento de tentativas próprio, separado do de rede
+# ---------------------------------------------------------------------------
+
+
+def test_schema_deviation_spends_two_attempts_not_six(
+    sample_pr, use_fake_agent, recorded_sleeps
+):
+    """Conteúdo fora do output_schema esgota 2 tentativas, não as 6 da rede.
+
+    O Agno engole o ValidationError e devolve a string crua em `content`;
+    a recusa é determinística, então repetir seis vezes só queima cota.
+    """
+    agent = use_fake_agent(FakeAgent('{"project_type": "monorepo"}'))
+
+    with pytest.raises(llm_client.SchemaRefusalError):
+        llm_client.classify_project_type_batch((sample_pr,))
+
+    assert len(agent.prompts) == 2
+
+
+def test_schema_deviation_throttles_before_every_attempt(
+    sample_pr, use_fake_agent, recorded_sleeps
+):
+    """O throttle de 2,1 s continua precedendo cada tentativa do caminho de schema."""
+    use_fake_agent(FakeAgent("desculpe, não posso classificar isso"))
+
+    with pytest.raises(llm_client.SchemaRefusalError):
+        llm_client.classify_project_type_batch((sample_pr,))
+
+    assert recorded_sleeps == [2.1, 2.1]
+
+
+def test_schema_refusal_names_the_repository_and_the_refused_content(
+    sample_pr, use_fake_agent, recorded_sleeps
+):
+    """A exceção é atribuível: identifica o repositório e o conteúdo recusado."""
+    agent = use_fake_agent(FakeAgent('{"project_type": "monorepo"}'))
+
+    with pytest.raises(llm_client.SchemaRefusalError) as excinfo:
+        llm_client.classify_project_type_batch((sample_pr,))
+
+    assert excinfo.value.repo == sample_pr.repo
+    assert sample_pr.repo in str(excinfo.value)
+    assert "monorepo" in str(excinfo.value)
+
+
+def test_schema_refusal_is_a_value_error_subclass():
+    """Subclasse de ValueError: chamadores antigos seguem capturando."""
+    assert issubclass(llm_client.SchemaRefusalError, ValueError)
+
+
+def test_transient_schema_deviation_recovers_on_the_retry(
+    sample_pr, use_fake_agent, recorded_sleeps
+):
+    """A tentativa extra cobre a flutuação genuína do JSON mode."""
+    agent = use_fake_agent(
+        FakeAgent(
+            '{"project": "library"}',
+            FakeClassification(project_type="library"),
+        )
+    )
+
+    raw = llm_client.classify_project_type_batch((sample_pr,))
+
+    assert json.loads(raw) == {"project_type": "library"}
+    assert len(agent.prompts) == 2
+
+
+def test_network_failures_do_not_consume_the_schema_budget(
+    sample_pr, use_fake_agent, recorded_sleeps
+):
+    """Rede e schema têm orçamentos independentes: 5 falhas de rede não impedem
+    que uma recusa de schema ainda tenha a sua retentativa."""
+    agent = use_fake_agent(
+        FakeAgent(
+            RuntimeError("connection reset"),
+            RuntimeError("connection reset"),
+            '{"project_type": "monorepo"}',
+            FakeClassification(project_type="cli"),
+        )
+    )
+
+    raw = llm_client.classify_project_type_batch((sample_pr,))
+
+    assert json.loads(raw) == {"project_type": "cli"}
+    assert len(agent.prompts) == 4
 
 
 # ---------------------------------------------------------------------------

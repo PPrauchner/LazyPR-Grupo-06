@@ -55,6 +55,14 @@ from core.models.pr_record import PRRecord
 _MAX_RETRIES: int = 6
 _BACKOFF_FACTOR: float = 2.0
 
+# Orçamento próprio para desvio de schema: uma retentativa cobre a flutuação
+# genuína do JSON mode, que é probabilístico. Além disso a recusa é
+# determinística — insistir só gasta cota e throttle (ver ADR-0004).
+_SCHEMA_MAX_ATTEMPTS: int = 2
+
+# Trecho do conteúdo recusado incluído na mensagem de erro, para atribuição.
+_REFUSED_CONTENT_PREVIEW: int = 200
+
 # Throttle: o plano gratuito do Groq limita 30 RPM → 1 requisição a cada 2 s
 # mais margem de segurança (≤ 28 RPM).
 _THROTTLE_SECONDS: float = 2.1
@@ -67,9 +75,7 @@ _DEFAULT_MODEL = "llama-3.1-8b-instant"
 # ---------------------------------------------------------------------------
 
 ProjectTypeValue = Literal["library", "web_app", "framework", "cli", "other"]
-PRNatureValue = Literal[
-    "bug_fix", "feature", "refactoring", "documentation", "other"
-]
+PRNatureValue = Literal["bug_fix", "feature", "refactoring", "documentation", "other"]
 ClarityLevelValue = Literal["insufficient", "basic", "good", "excellent"]
 
 
@@ -96,6 +102,36 @@ class PRNatureAndClarityOutput(BaseModel):
 
     pr_nature: PRNatureValue
     clarity_level: ClarityLevelValue
+
+
+# ---------------------------------------------------------------------------
+# Erros
+# ---------------------------------------------------------------------------
+
+
+class SchemaRefusalError(ValueError):
+    """O modelo devolveu conteúdo que não satisfaz o `output_schema`.
+
+    Distinta da falha de rede: tem orçamento de tentativas próprio e não é
+    convertida em sentinela `unknown` — silenciar a recusa contaminaria as
+    correlações sem deixar rastro (ADR-0004). Subclasse de `ValueError` para
+    que chamadores que já capturam `ValueError` sigam funcionando.
+
+    Attributes:
+        repo: Repositório cujo lote provocou a recusa.
+        content: Conteúdo bruto recusado, já truncado para exibição.
+    """
+
+    def __init__(self, repo: str, content: object, attempts: int) -> None:
+        self.repo = repo
+        self.content = str(content)[:_REFUSED_CONTENT_PREVIEW]
+        self.attempts = attempts
+        super().__init__(
+            f"O LLM devolveu conteúdo fora do schema para o repositório "
+            f"'{repo}' em {attempts} tentativa(s). Conteúdo recusado: "
+            f"{self.content!r}"
+        )
+
 
 # ---------------------------------------------------------------------------
 # Helpers privados
@@ -259,15 +295,22 @@ def _build_prompt(
 def _invoke_with_retry(
     agent: Agent,
     prompt: str,
+    repo: str = "desconhecido",
     max_retries: int = _MAX_RETRIES,
     backoff: float = _BACKOFF_FACTOR,
+    schema_max_attempts: int = _SCHEMA_MAX_ATTEMPTS,
 ) -> BaseModel:
     """
-    Invoca o agente Agno com throttle, retry e backoff exponencial.
+    Invoca o agente Agno com throttle e dois orçamentos de tentativa distintos.
 
     Esta função — e não o Agno — é a dona do controle de rate limit: aplica
     o throttle antes de cada requisição, respeita o tempo sugerido em erros
-    429 e recua exponencialmente nas demais falhas.
+    429 e recua exponencialmente nas falhas de rede.
+
+    Falha de rede e desvio de schema não compartilham política. A rede é
+    transitória e merece backoff longo; a recusa de schema é largamente
+    determinística e insistir nela só queima cota. Por isso cada uma tem o seu
+    orçamento, contado em separado.
 
     Laço justificado: retry de I/O de rede é inerentemente imperativo
     e pertence exclusivamente à camada services/.
@@ -275,44 +318,63 @@ def _invoke_with_retry(
     Args:
         agent: Instância de Agent do Agno já configurada com output_schema.
         prompt: Prompt completo a ser enviado.
-        max_retries: Número máximo de tentativas.
+        repo: Repositório de origem, usado para tornar a falha atribuível.
+        max_retries: Número máximo de tentativas para falhas de rede.
         backoff: Fator base para o backoff exponencial em segundos.
+        schema_max_attempts: Número máximo de tentativas para desvio de schema.
 
     Returns:
         Instância do schema Pydantic validada pelo Agno.
 
     Raises:
-        ValueError: Se todas as tentativas falharem ou retornarem vazio.
+        SchemaRefusalError: Se o conteúdo devolvido não satisfizer o
+            `output_schema` após esgotado o orçamento de schema.
+        ValueError: Se as tentativas de rede se esgotarem.
     """
-    last_exc: Exception = ValueError("Nenhuma tentativa foi realizada.")
+    network_attempts = 0
+    schema_attempts = 0
 
     # Laço justificado: retry de I/O de rede (services/)
-    for attempt in range(max_retries):
+    while True:
+        # Throttle obrigatório antes de cada requisição (30 RPM no plano free)
+        time.sleep(_THROTTLE_SECONDS)
         try:
-            # Throttle obrigatório antes de cada requisição (30 RPM no plano free)
-            time.sleep(_THROTTLE_SECONDS)
-            result = agent.run(prompt).content
-            if not hasattr(result, "model_dump_json"):
-                raise ValueError(
-                    f"LLM retornou resposta vazia ou não estruturada na "
-                    f"tentativa {attempt + 1}."
-                )
-            return result
+            response = agent.run(prompt)
         except Exception as exc:
-            last_exc = exc
-            if attempt < max_retries - 1:
-                error_str = str(exc)
-                # Erro 429: respeita o tempo sugerido pelo Groq ("try again in Xs")
-                if "429" in error_str or "rate_limit_exceeded" in error_str:
-                    wait = _parse_retry_after(error_str, default=backoff * (2 ** attempt))
-                else:
-                    wait = backoff * (2 ** attempt)
-                logger.warning(f"Tentativa {attempt + 1} falhou. Aguardando {wait:.1f}s...")
-                time.sleep(wait)
+            network_attempts += 1
+            if network_attempts >= max_retries:
+                raise ValueError(
+                    f"LLM falhou após {max_retries} tentativas. " f"Último erro: {exc}"
+                ) from exc
+            error_str = str(exc)
+            # Erro 429: respeita o tempo sugerido pelo Groq ("try again in Xs")
+            exponential = backoff * (2 ** (network_attempts - 1))
+            if "429" in error_str or "rate_limit_exceeded" in error_str:
+                wait = _parse_retry_after(error_str, default=exponential)
+            else:
+                wait = exponential
+            logger.warning(
+                f"Tentativa de rede {network_attempts} falhou. "
+                f"Aguardando {wait:.1f}s..."
+            )
+            time.sleep(wait)
+            continue
 
-    raise ValueError(
-        f"LLM falhou após {max_retries} tentativas. " f"Último erro: {last_exc}"
-    ) from last_exc
+        content = getattr(response, "content", None)
+        if hasattr(content, "model_dump_json"):
+            return content
+
+        # Desvio de schema (ou resposta vazia): o Agno engole o ValidationError
+        # e devolve o conteúdo cru, então o guarda é a ausência do serializador.
+        schema_attempts += 1
+        if schema_attempts >= schema_max_attempts:
+            raise SchemaRefusalError(
+                repo=repo, content=content, attempts=schema_attempts
+            )
+        logger.warning(
+            f"Resposta fora do output_schema para '{repo}' na tentativa "
+            f"{schema_attempts}. Repetindo uma vez."
+        )
 
 
 # ---------------------------------------------------------------------------
@@ -353,7 +415,9 @@ def classify_project_type_batch(records: tuple[PRRecord, ...]) -> str:
     agent = _build_agent(api_key, model, ProjectTypeOutput)
     prompt = _build_prompt(records, max_chars)
 
-    return _invoke_with_retry(agent=agent, prompt=prompt).model_dump_json()
+    return _invoke_with_retry(
+        agent=agent, prompt=prompt, repo=records[0].repo
+    ).model_dump_json()
 
 
 def classify_pr_nature_single(record: PRRecord) -> str:
@@ -392,7 +456,9 @@ def classify_pr_nature_single(record: PRRecord) -> str:
     logger.debug(f"Usando modelo LLM: {model} para classify_pr_nature_single")
 
     agent = _build_agent(api_key, model, PRNatureOutput)
-    return _invoke_with_retry(agent=agent, prompt=prompt).model_dump_json()
+    return _invoke_with_retry(
+        agent=agent, prompt=prompt, repo=record.repo
+    ).model_dump_json()
 
 
 def classify_clarity_single(record: PRRecord) -> str:
@@ -429,7 +495,9 @@ def classify_clarity_single(record: PRRecord) -> str:
     logger.debug(f"Usando modelo LLM: {model} para classify_clarity_single")
 
     agent = _build_agent(api_key, model, ClarityOutput)
-    return _invoke_with_retry(agent=agent, prompt=prompt).model_dump_json()
+    return _invoke_with_retry(
+        agent=agent, prompt=prompt, repo=record.repo
+    ).model_dump_json()
 
 
 def classify_pr_nature_and_clarity_single(record: PRRecord) -> str:
@@ -469,4 +537,6 @@ def classify_pr_nature_and_clarity_single(record: PRRecord) -> str:
     )
 
     agent = _build_agent(api_key, model, PRNatureAndClarityOutput)
-    return _invoke_with_retry(agent=agent, prompt=prompt).model_dump_json()
+    return _invoke_with_retry(
+        agent=agent, prompt=prompt, repo=record.repo
+    ).model_dump_json()
