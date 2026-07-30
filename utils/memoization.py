@@ -20,7 +20,12 @@ Relacionado a:
 
 from typing import Any, Callable, Generator, TypeVar
 
-from services.storage import has_cached_analysis, load_results, save_results
+from services.storage import (
+    REPO_CLASSIFICATION_NAMESPACE,
+    has_cached_analysis,
+    load_results,
+    save_results,
+)
 
 T = TypeVar("T")
 
@@ -42,9 +47,13 @@ def cached_classify(
     Yields:
         Resultado de classificação (cached ou fresh).
     """
-    # Verificar se já está em cache em disco
-    if has_cached_analysis(content_hash):
-        cached_results = list(load_results(content_hash))
+    # Verificar se já está em cache em disco. O namespace mantém estas
+    # classificações fora do espaço da Análise do dataset: versionar uma não
+    # invalida a outra (issue #101).
+    if has_cached_analysis(content_hash, namespace=REPO_CLASSIFICATION_NAMESPACE):
+        cached_results = list(
+            load_results(content_hash, namespace=REPO_CLASSIFICATION_NAMESPACE)
+        )
         yield from cached_results
         return
 
@@ -52,7 +61,7 @@ def cached_classify(
     results = list(classify_fn())
 
     # Persistir para próximas sessões
-    save_results(content_hash, results)
+    save_results(content_hash, results, namespace=REPO_CLASSIFICATION_NAMESPACE)
     yield from results
 
 
@@ -63,6 +72,6 @@ def clear_cache() -> None:
     Utilizado em testes para garantir estado limpo entre execuções.
     """
     from core.transforms.normalizing import normalize_language, normalize_label
+
     normalize_language.cache_clear()
     normalize_label.cache_clear()
-
