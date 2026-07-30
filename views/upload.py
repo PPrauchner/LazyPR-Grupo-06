@@ -12,6 +12,7 @@ from streamlit.runtime.uploaded_file_manager import UploadedFile
 
 from core.transforms.cleaning import get_missing_columns
 from services.ingestion import read_header_lazily, stream_csv
+from services.llm_client import SchemaRefusalError
 from core.pipeline.runner import run_pipeline, PipelineConfig
 from services.storage import has_cached_analysis, load_results, save_results
 from utils.hashing import hash_file_stream
@@ -160,12 +161,29 @@ def render_upload_page() -> None:
                 enable_classification=True,
             )
 
-            resultados_lazy = run_pipeline(
-                source_stream,
-                config,
-            )
+            # A recusa de schema é falha alta e deliberada: não vira sentinela
+            # `unknown` (ADR-0004). Aqui ela só troca de forma — vira mensagem
+            # legível nomeando o repositório, em vez de traceback cru.
+            try:
 
-            resultados_finais = tuple(resultados_lazy)
+                resultados_lazy = run_pipeline(
+                    source_stream,
+                    config,
+                )
+
+                resultados_finais = tuple(resultados_lazy)
+
+            except SchemaRefusalError as refusal:
+
+                st.error(
+                    f"O modelo devolveu uma classificação fora do vocabulário "
+                    f"controlado para o repositório **{refusal.repo}**, e a "
+                    f"análise foi interrompida sem gravar resultados. "
+                    f"Conteúdo recusado: `{refusal.content}`"
+                )
+
+                st.stop()
+                return
 
         save_results(
             file_hash,
