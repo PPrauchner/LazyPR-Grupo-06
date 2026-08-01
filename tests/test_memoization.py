@@ -88,6 +88,104 @@ class TestCachedClassifyNamespace:
         assert [r.id for r in cached] == [1]
 
 
+class TestCachedClassifyCorruptedCache:
+    """Cache de repositório corrompido recomputa, em vez de truncar a Análise."""
+
+    def _result(self, result_id: int = 1) -> AnalysisResult:
+        """Constrói um AnalysisResult mínimo para os testes de corrupção."""
+        return AnalysisResult(
+            id=result_id,
+            html_url="https://github.com/repo/test/pull/10#comment-1",
+            repo="repo/test",
+            path="src/main.py",
+            body="Body",
+            diff_hunk="@@ -10,5 +10,5 @@",
+            author="author",
+            author_association="CONTRIBUTOR",
+            commit_id="abc123",
+            line=10,
+            language="Python",
+            created_at="2024-01-01",
+            project_type="library",
+            pr_nature="feature",
+            clarity_level="good",
+            char_count=4,
+            word_count=1,
+        )
+
+    def _write_raw_repo_cache(self, cache_key: str, content: str) -> None:
+        """Grava conteúdo cru no cache de classificações por repositório."""
+        from services import storage
+
+        cache_path = storage._cache_path(
+            cache_key, namespace=storage.REPO_CLASSIFICATION_NAMESPACE
+        )
+        cache_path.parent.mkdir(parents=True, exist_ok=True)
+        with open(cache_path, "w", encoding="utf-8") as f:
+            f.write(content)
+
+    def test_corrupted_cache_triggers_reclassification(self, temp_cache_dir):
+        """JSON inválido não vira hit vazio: a classificação roda de novo."""
+        cache_key = "repo_hash_corrompido"
+        self._write_raw_repo_cache(cache_key, "{ nao_e_json: [")
+
+        call_count = {"n": 0}
+
+        def classify_fn() -> Generator[AnalysisResult, None, None]:
+            call_count["n"] += 1
+            yield self._result(1)
+
+        results = list(memoization.cached_classify(classify_fn, cache_key))
+
+        assert call_count["n"] == 1
+        assert [r.id for r in results] == [1]
+
+    def test_partially_malformed_cache_does_not_return_prefix(self, temp_cache_dir):
+        """Lista com um item bom e um quebrado não entrega o prefixo parcial."""
+        import json as _json
+
+        cache_key = "repo_hash_parcial"
+        self._write_raw_repo_cache(
+            cache_key,
+            _json.dumps(
+                [self._result(1)._asdict(), {"id": 2, "campo_estranho": "valor"}]
+            ),
+        )
+
+        call_count = {"n": 0}
+
+        def classify_fn() -> Generator[AnalysisResult, None, None]:
+            call_count["n"] += 1
+            yield self._result(10)
+            yield self._result(11)
+
+        results = list(memoization.cached_classify(classify_fn, cache_key))
+
+        # Nem o prefixo válido ([1]) nem um conjunto vazio: recomputou inteiro.
+        assert call_count["n"] == 1
+        assert [r.id for r in results] == [10, 11]
+
+    def test_corrupted_cache_is_overwritten_by_fresh_results(self, temp_cache_dir):
+        """Após recomputar, o cache corrompido é substituído por um íntegro."""
+        from services import storage
+
+        cache_key = "repo_hash_sobrescrito"
+        self._write_raw_repo_cache(cache_key, "lixo")
+
+        def classify_fn() -> Generator[AnalysisResult, None, None]:
+            yield self._result(42)
+
+        list(memoization.cached_classify(classify_fn, cache_key))
+
+        assert storage.has_cached_analysis(
+            cache_key, namespace=storage.REPO_CLASSIFICATION_NAMESPACE
+        )
+        cached = storage.read_results(
+            cache_key, namespace=storage.REPO_CLASSIFICATION_NAMESPACE
+        )
+        assert [r.id for r in cached] == [42]
+
+
 class TestCachedClassify:
     """Testes para cached_classify()."""
 

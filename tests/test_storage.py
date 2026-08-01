@@ -260,6 +260,107 @@ class TestStorageEdgeCases:
         assert not storage.has_cached_analysis(repo_hash)
 
 
+class TestCorruptedCacheIsMiss:
+    """Cache ilegível degrada para miss — nunca vira hit truncado."""
+
+    def _result(self, result_id: int = 1) -> AnalysisResult:
+        """Constrói um AnalysisResult mínimo para os testes de corrupção."""
+        return AnalysisResult(
+            id=result_id,
+            html_url="https://github.com/repo/test/pull/10#comment-1",
+            repo="repo/test",
+            path="src/main.py",
+            body="Body",
+            diff_hunk="@@ -10,5 +10,5 @@",
+            author="author",
+            author_association="CONTRIBUTOR",
+            commit_id="abc123",
+            line=10,
+            language="Python",
+            created_at="2024-01-01",
+            project_type="library",
+            pr_nature="feature",
+            clarity_level="good",
+            char_count=4,
+            word_count=1,
+        )
+
+    def _write_raw(self, repo_hash: str, content: str) -> None:
+        """Grava conteúdo cru no arquivo de cache da Análise."""
+        cache_path = storage._cache_path(repo_hash)
+        cache_path.parent.mkdir(parents=True, exist_ok=True)
+        with open(cache_path, "w", encoding="utf-8") as f:
+            f.write(content)
+
+    def test_corrupted_json_is_not_a_cache_hit(self, temp_cache_dir):
+        """JSON inválido não pode passar por hit: o chamador deve recomputar."""
+        repo_hash = "hash_json_corrompido"
+        self._write_raw(repo_hash, "{ json_invalido: [ ")
+
+        assert not storage.has_cached_analysis(repo_hash)
+        assert storage.read_results(repo_hash) is None
+
+    def test_partially_malformed_list_is_not_a_cache_hit(self, temp_cache_dir):
+        """Um item bom e um quebrado invalidam o cache inteiro, não meio dele."""
+        repo_hash = "hash_lista_parcial"
+        self._write_raw(
+            repo_hash,
+            json.dumps(
+                [self._result(1)._asdict(), {"id": 2, "campo_estranho": "valor"}]
+            ),
+        )
+
+        assert not storage.has_cached_analysis(repo_hash)
+        assert storage.read_results(repo_hash) is None
+
+    def test_partially_malformed_list_yields_no_partial_prefix(self, temp_cache_dir):
+        """load_results() não entrega o prefixo válido de um cache corrompido."""
+        repo_hash = "hash_sem_prefixo"
+        self._write_raw(
+            repo_hash,
+            json.dumps(
+                [self._result(1)._asdict(), {"id": 2, "campo_estranho": "valor"}]
+            ),
+        )
+
+        assert list(storage.load_results(repo_hash)) == []
+
+    def test_non_list_payload_is_not_a_cache_hit(self, temp_cache_dir):
+        """JSON válido que não é lista também é miss, não hit vazio."""
+        repo_hash = "hash_objeto_no_lugar_de_lista"
+        self._write_raw(repo_hash, json.dumps({"nao": "e uma lista"}))
+
+        assert not storage.has_cached_analysis(repo_hash)
+
+    def test_valid_cache_still_reads_as_hit(self, temp_cache_dir):
+        """A validação não pode transformar cache íntegro em miss."""
+        repo_hash = "hash_integro"
+        storage.save_results(repo_hash, [self._result(7)])
+
+        assert storage.has_cached_analysis(repo_hash)
+        assert [r.id for r in storage.read_results(repo_hash)] == [7]
+
+
+class TestSchemaVersionNamespaces:
+    """_schema_version() não tem fallback mudo."""
+
+    def test_known_namespaces_map_to_own_versions(self):
+        """Cada namespace conhecido devolve a própria versão de esquema."""
+        assert (
+            storage._schema_version(storage.ANALYSIS_NAMESPACE)
+            == storage.CACHE_SCHEMA_VERSION
+        )
+        assert (
+            storage._schema_version(storage.REPO_CLASSIFICATION_NAMESPACE)
+            == storage.REPO_CLASSIFICATION_SCHEMA_VERSION
+        )
+
+    def test_unknown_namespace_raises(self):
+        """Namespace desconhecido falha alto em vez de herdar outra versão."""
+        with pytest.raises(KeyError):
+            storage._schema_version("namespace-inexistente")
+
+
 class TestStorageEmptyStates:
 
     def test_save_and_load_empty_results_list(self, temp_cache_dir):
