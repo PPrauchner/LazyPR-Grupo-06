@@ -12,6 +12,7 @@ Responsabilidades:
 """
 
 import json
+import logging
 
 import pytest
 
@@ -166,9 +167,9 @@ def test_schema_deviation_spends_two_attempts_not_six(
     """
     agent = use_fake_agent(FakeAgent('{"project_type": "monorepo"}'))
 
-    with pytest.raises(llm_client.SchemaRefusalError):
-        llm_client.classify_project_type_batch((sample_pr,))
+    raw = llm_client.classify_project_type_batch((sample_pr,))
 
+    assert json.loads(raw) == {"project_type": "unknown"}
     assert len(agent.prompts) == 2
 
 
@@ -178,29 +179,95 @@ def test_schema_deviation_throttles_before_every_attempt(
     """O throttle de 2,1 s continua precedendo cada tentativa do caminho de schema."""
     use_fake_agent(FakeAgent("desculpe, não posso classificar isso"))
 
-    with pytest.raises(llm_client.SchemaRefusalError):
-        llm_client.classify_project_type_batch((sample_pr,))
+    llm_client.classify_project_type_batch((sample_pr,))
 
     assert recorded_sleeps == [2.1, 2.1]
 
 
-def test_schema_refusal_names_the_repository_and_the_refused_content(
+def test_schema_refusal_degrades_instead_of_raising(
     sample_pr, use_fake_agent, recorded_sleeps
 ):
-    """A exceção é atribuível: identifica o repositório e o conteúdo recusado."""
-    agent = use_fake_agent(FakeAgent('{"project_type": "monorepo"}'))
+    """Esgotado o orçamento de schema, a classificação vira o sentinela.
 
-    with pytest.raises(llm_client.SchemaRefusalError) as excinfo:
+    Propagar abortaria a Análise inteira e descartaria tudo o que já foi pago
+    em cota do Groq (ADR-0004).
+    """
+    use_fake_agent(FakeAgent('{"project_type": "monorepo"}'))
+
+    raw = llm_client.classify_project_type_batch((sample_pr,))
+
+    assert json.loads(raw) == {"project_type": "unknown"}
+
+
+def test_schema_refusal_logs_the_repository_and_the_refused_content(
+    sample_pr, use_fake_agent, recorded_sleeps, caplog
+):
+    """A recusa é atribuível no log: repositório e conteúdo recusado."""
+    use_fake_agent(FakeAgent('{"project_type": "monorepo"}'))
+
+    with caplog.at_level(logging.ERROR, logger=llm_client.__name__):
         llm_client.classify_project_type_batch((sample_pr,))
 
-    assert excinfo.value.repo == sample_pr.repo
-    assert sample_pr.repo in str(excinfo.value)
-    assert "monorepo" in str(excinfo.value)
+    assert sample_pr.repo in caplog.text
+    assert "monorepo" in caplog.text
 
 
-def test_schema_refusal_is_a_value_error_subclass():
-    """Subclasse de ValueError: chamadores antigos seguem capturando."""
-    assert issubclass(llm_client.SchemaRefusalError, ValueError)
+def test_nature_and_clarity_refusal_degrades_both_fields(
+    sample_pr, use_fake_agent, recorded_sleeps
+):
+    """A chamada unificada degrada os dois campos de uma vez."""
+    use_fake_agent(FakeAgent("não posso classificar isso"))
+
+    raw = llm_client.classify_pr_nature_and_clarity_single(sample_pr)
+
+    assert json.loads(raw) == {"pr_nature": "unknown", "clarity_level": "unknown"}
+
+
+# ---------------------------------------------------------------------------
+# Desvio de schema que chega como exceção — HTTP 400 `json_validate_failed`
+# ---------------------------------------------------------------------------
+
+
+def test_json_validate_failed_uses_the_schema_budget_not_the_network_one(
+    sample_pr, use_fake_agent, recorded_sleeps
+):
+    """O 400 `json_validate_failed` do Groq é desvio de schema, não falha de rede.
+
+    Sem essa classificação, a recusa determinística consumiria 6 tentativas
+    com backoff exponencial (~62 s) antes de falhar.
+    """
+    agent = use_fake_agent(
+        FakeAgent(
+            RuntimeError(
+                "Error code: 400 - {'error': {'code': 'json_validate_failed', "
+                "'message': 'Failed to generate JSON.'}}"
+            )
+        )
+    )
+
+    raw = llm_client.classify_project_type_batch((sample_pr,))
+
+    assert json.loads(raw) == {"project_type": "unknown"}
+    assert len(agent.prompts) == 2
+    # Só o throttle: nenhum backoff exponencial foi aplicado.
+    assert recorded_sleeps == [2.1, 2.1]
+
+
+def test_transient_json_validate_failed_recovers_on_the_retry(
+    sample_pr, use_fake_agent, recorded_sleeps
+):
+    """A retentativa de schema também cobre o 400 transitório."""
+    agent = use_fake_agent(
+        FakeAgent(
+            RuntimeError("Error code: 400 - json_validate_failed"),
+            FakeClassification(project_type="library"),
+        )
+    )
+
+    raw = llm_client.classify_project_type_batch((sample_pr,))
+
+    assert json.loads(raw) == {"project_type": "library"}
+    assert len(agent.prompts) == 2
 
 
 def test_transient_schema_deviation_recovers_on_the_retry(
