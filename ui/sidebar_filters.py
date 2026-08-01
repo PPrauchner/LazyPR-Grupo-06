@@ -15,7 +15,9 @@ Não deve:
 """
 
 import streamlit as st
+from collections.abc import Callable, Mapping
 from datetime import date
+from types import MappingProxyType
 
 from ui.layout import (
     render_section_title,
@@ -32,35 +34,93 @@ from core.transforms.filtering import (
     is_in_date_range,
 )
 
-LANGUAGES = (
-    "Python",
-    "JavaScript",
-    "Java",
-    "Go",
-    "TypeScript",
-    "Ruby",
+# `language` não é vocabulário de LLM: é derivada da extensão do arquivo em `path`.
+# A lista da sidebar é derivada da mesma fonte para não divergir do que o sistema
+# realmente produz (ver CLAUDE.md §7).
+from services.ingestion import _EXTENSION_TO_LANGUAGE
+
+LANGUAGES: tuple[str, ...] = tuple(sorted(frozenset(_EXTENSION_TO_LANGUAGE.values())))
+
+LANGUAGE_LABELS: Mapping[str, str] = MappingProxyType(
+    {
+        "c": "C",
+        "cpp": "C++",
+        "csharp": "C#",
+        "dart": "Dart",
+        "go": "Go",
+        "java": "Java",
+        "javascript": "JavaScript",
+        "kotlin": "Kotlin",
+        "php": "PHP",
+        "python": "Python",
+        "ruby": "Ruby",
+        "rust": "Rust",
+        "scala": "Scala",
+        "swift": "Swift",
+        "typescript": "TypeScript",
+    }
 )
 
-PROJECT_TYPES = (
-    "Framework",
-    "Library",
-    "CLI",
-    "Web App",
-    "Other",
+# Os vocabulários abaixo são os valores canônicos da §8 do CLAUDE.md — o que o
+# pipeline grava em AnalysisResult e o que os predicados de core/transforms/
+# filtering.py comparam. Os rótulos legíveis vivem apenas nos mapas *_LABELS,
+# consumidos via `format_func`; o valor que trafega é sempre o canônico.
+PROJECT_TYPES: tuple[str, ...] = (
+    "library",
+    "web_app",
+    "framework",
+    "cli",
+    "other",
+    "unknown",
 )
 
-PR_NATURES = (
+PROJECT_TYPE_LABELS: Mapping[str, str] = MappingProxyType(
+    {
+        "library": "Biblioteca",
+        "web_app": "Aplicação Web",
+        "framework": "Framework",
+        "cli": "CLI",
+        "other": "Outro",
+        "unknown": "Desconhecido",
+    }
+)
+
+PR_NATURES: tuple[str, ...] = (
     "bug_fix",
     "feature",
     "refactoring",
     "documentation",
+    "other",
+    "unknown",
 )
 
-CLARITY_LEVELS = (
+PR_NATURE_LABELS: Mapping[str, str] = MappingProxyType(
+    {
+        "bug_fix": "Correção de Bug",
+        "feature": "Nova Funcionalidade",
+        "refactoring": "Refatoração",
+        "documentation": "Documentação",
+        "other": "Outra",
+        "unknown": "Desconhecida",
+    }
+)
+
+CLARITY_LEVELS: tuple[str, ...] = (
     "excellent",
     "good",
     "basic",
     "insufficient",
+    "unknown",
+)
+
+CLARITY_LEVEL_LABELS: Mapping[str, str] = MappingProxyType(
+    {
+        "excellent": "Excelente",
+        "good": "Boa",
+        "basic": "Básica",
+        "insufficient": "Insuficiente",
+        "unknown": "Desconhecida",
+    }
 )
 
 PAGES = (
@@ -70,6 +130,22 @@ PAGES = (
     "🔥 Correlação",
     "💾 Exportação",
 )
+
+
+def label_formatter(labels: Mapping[str, str]) -> Callable[[str], str]:
+    """Cria a `format_func` que exibe o rótulo legível de um valor canônico.
+
+    O widget continua trafegando o valor canônico (o que os predicados de
+    `core/transforms/filtering.py` comparam); só a exibição é traduzida.
+
+    Args:
+        labels: Mapa de valor canônico para rótulo legível.
+
+    Returns:
+        Função que traduz um valor canônico em rótulo, devolvendo o próprio
+        valor quando não houver rótulo cadastrado.
+    """
+    return lambda value: labels.get(value, value)
 
 
 def get_active_filters() -> Predicate:
@@ -195,24 +271,28 @@ def render_sidebar() -> dict:
             "Linguagens",
             LANGUAGES,
             key="selected_languages",
+            format_func=label_formatter(LANGUAGE_LABELS),
         )
 
         st.multiselect(
             "Tipos de Projeto",
             PROJECT_TYPES,
             key="selected_project_types",
+            format_func=label_formatter(PROJECT_TYPE_LABELS),
         )
 
         st.multiselect(
             "Natureza da Contribuição",
             PR_NATURES,
             key="selected_natures",
+            format_func=label_formatter(PR_NATURE_LABELS),
         )
 
         st.multiselect(
             "Nível de Clareza",
             CLARITY_LEVELS,
             key="selected_clarity",
+            format_func=label_formatter(CLARITY_LEVEL_LABELS),
         )
 
         use_date_filter = st.checkbox(
