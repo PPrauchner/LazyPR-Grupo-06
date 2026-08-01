@@ -3,13 +3,19 @@ from datetime import datetime, date
 from unittest.mock import patch, MagicMock
 from ui.sidebar_filters import (
     get_active_filters,
+    label_formatter,
     CLARITY_LEVELS,
+    CLARITY_LEVEL_LABELS,
     LANGUAGES,
+    LANGUAGE_LABELS,
     PROJECT_TYPES,
+    PROJECT_TYPE_LABELS,
     PR_NATURES,
+    PR_NATURE_LABELS,
     PAGES,
 )
 from core.models.analysis_result import AnalysisResult
+from services.ingestion import _EXTENSION_TO_LANGUAGE
 
 
 @pytest.fixture
@@ -26,7 +32,7 @@ def sample_analysis_result():
         author_association="CONTRIBUTOR",
         commit_id="abc123def456",
         line=42,
-        language="Python",
+        language="python",
         created_at="2024-01-15",
         project_type="library",
         pr_nature="feature",
@@ -39,30 +45,69 @@ def sample_analysis_result():
 def test_clarity_levels_vocabulary_is_correct():
     """
     Garante que o vocabulário do nível de clareza corresponda exatamente
-    ao que é gerado pela classificação.
+    ao que é gerado pela classificação (CLAUDE.md §8), incluindo o sentinela
+    `unknown` de falha do LLM.
     """
-    expected_levels = ("excellent", "good", "basic", "insufficient")
+    expected_levels = frozenset(
+        ("excellent", "good", "basic", "insufficient", "unknown")
+    )
     assert (
-        CLARITY_LEVELS == expected_levels
-    ), "O vocabulário de CLARITY_LEVELS foi alterado e quebrará os filtros."
+        frozenset(CLARITY_LEVELS) == expected_levels
+    ), "O vocabulário de CLARITY_LEVELS divergiu da §8 e quebrará os filtros."
 
 
-def test_languages_vocabulary_not_empty():
-    """Verifica que a lista de linguagens não está vazia."""
-    assert len(LANGUAGES) > 0, "LANGUAGES deve conter pelo menos uma linguagem."
-    assert "Python" in LANGUAGES, "Python deveria estar na lista de LANGUAGES."
+def test_project_types_vocabulary_is_correct():
+    """Garante que os tipos de projeto sejam os valores canônicos da §8."""
+    expected_types = frozenset(
+        ("library", "web_app", "framework", "cli", "other", "unknown")
+    )
+    assert (
+        frozenset(PROJECT_TYPES) == expected_types
+    ), "O vocabulário de PROJECT_TYPES divergiu da §8 e quebrará os filtros."
 
 
-def test_project_types_vocabulary_not_empty():
-    """Verifica que a lista de tipos de projeto não está vazia."""
-    assert len(PROJECT_TYPES) > 0, "PROJECT_TYPES deve conter pelo menos um tipo."
-    assert "Framework" in PROJECT_TYPES, "Framework deveria estar na lista."
+def test_pr_natures_vocabulary_is_correct():
+    """Garante que as naturezas de PR sejam os valores canônicos da §8."""
+    expected_natures = frozenset(
+        ("bug_fix", "feature", "refactoring", "documentation", "other", "unknown")
+    )
+    assert (
+        frozenset(PR_NATURES) == expected_natures
+    ), "O vocabulário de PR_NATURES divergiu da §8 e quebrará os filtros."
 
 
-def test_pr_natures_vocabulary_not_empty():
-    """Verifica que a lista de naturezas de PR não está vazia."""
-    assert len(PR_NATURES) > 0, "PR_NATURES deve conter pelo menos uma natureza."
-    assert "bug_fix" in PR_NATURES, "bug_fix deveria estar na lista de PR_NATURES."
+def test_languages_vocabulary_matches_extension_map():
+    """
+    A lista de linguagens da sidebar deve cobrir exatamente o que a ingestão
+    infere da extensão do arquivo — nada inalcançável, nada inexistente.
+    """
+    assert frozenset(LANGUAGES) == frozenset(
+        _EXTENSION_TO_LANGUAGE.values()
+    ), "LANGUAGES divergiu de _EXTENSION_TO_LANGUAGE."
+    assert "rust" in LANGUAGES, "Rust é inferida pela ingestão e deve ser filtrável."
+
+
+@pytest.mark.parametrize(
+    "vocabulary, labels",
+    (
+        (PROJECT_TYPES, PROJECT_TYPE_LABELS),
+        (PR_NATURES, PR_NATURE_LABELS),
+        (CLARITY_LEVELS, CLARITY_LEVEL_LABELS),
+        (LANGUAGES, LANGUAGE_LABELS),
+    ),
+)
+def test_every_canonical_value_has_a_display_label(vocabulary, labels):
+    """Todo valor canônico exibido no sidebar precisa de um rótulo legível."""
+    missing = tuple(value for value in vocabulary if value not in labels)
+    assert missing == (), f"Valores sem rótulo de exibição: {missing}"
+
+
+def test_label_formatter_keeps_canonical_value_when_label_is_missing():
+    """Um valor sem rótulo cadastrado é exibido como ele mesmo, não quebra a UI."""
+    formatter = label_formatter(PROJECT_TYPE_LABELS)
+
+    assert formatter("web_app") == "Aplicação Web"
+    assert formatter("brand_new_value") == "brand_new_value"
 
 
 def test_pages_vocabulary_not_empty():
@@ -95,7 +140,7 @@ def test_get_active_filters_with_language_selection(mock_st, sample_analysis_res
     e filtra registros apropriadamente.
     """
     mock_st.session_state = {
-        "selected_languages": ("Python",),
+        "selected_languages": ("python",),
         "selected_project_types": (),
         "selected_natures": (),
         "selected_clarity": (),
@@ -110,7 +155,7 @@ def test_get_active_filters_with_language_selection(mock_st, sample_analysis_res
     ), "Registro com Python deveria passar no filtro."
 
     # Resultado com outra linguagem deve falhar
-    other_result = sample_analysis_result._replace(language="Java")
+    other_result = sample_analysis_result._replace(language="java")
     assert (
         predicate(other_result) is False
     ), "Registro com Java deveria ser filtrado para linguagem Python."
@@ -148,7 +193,7 @@ def test_get_active_filters_with_project_type_selection(
     """
     mock_st.session_state = {
         "selected_languages": (),
-        "selected_project_types": ("Library",),
+        "selected_project_types": ("library",),
         "selected_natures": (),
         "selected_clarity": (),
         "use_date_filter": False,
@@ -194,8 +239,8 @@ def test_get_active_filters_with_multiple_criteria(mock_st, sample_analysis_resu
     Apenas registros que satisfazem TODOS os critérios devem passar.
     """
     mock_st.session_state = {
-        "selected_languages": ("Python",),
-        "selected_project_types": ("Library",),
+        "selected_languages": ("python",),
+        "selected_project_types": ("library",),
         "selected_natures": ("feature",),
         "selected_clarity": ("good",),
         "use_date_filter": False,
@@ -207,7 +252,7 @@ def test_get_active_filters_with_multiple_criteria(mock_st, sample_analysis_resu
     assert predicate(sample_analysis_result) is True
 
     # Resultado que falha em um critério deve falhar
-    fails_language = sample_analysis_result._replace(language="Java")
+    fails_language = sample_analysis_result._replace(language="java")
     assert predicate(fails_language) is False
 
     fails_clarity = sample_analysis_result._replace(clarity_level="basic")
@@ -255,6 +300,106 @@ def test_get_active_filters_with_no_filters_returns_identity(mock_st):
     )
 
     assert predicate(test_result) is True
+
+
+def _empty_session_state() -> dict:
+    """Session state sem nenhum filtro ativo, base dos testes de round-trip."""
+    return {
+        "selected_languages": (),
+        "selected_project_types": (),
+        "selected_natures": (),
+        "selected_clarity": (),
+        "use_date_filter": False,
+    }
+
+
+@pytest.mark.parametrize("project_type", PROJECT_TYPES)
+@patch("ui.sidebar_filters.st")
+def test_every_project_type_selection_matches_canonical_record(
+    mock_st, project_type, sample_analysis_result
+):
+    """
+    Selecionar qualquer tipo de projeto na sidebar deve casar com registros cujo
+    `project_type` é o valor canônico correspondente — inclusive `web_app`, que
+    o rótulo "Web App" jamais alcançava.
+    """
+    mock_st.session_state = {
+        **_empty_session_state(),
+        "selected_project_types": (project_type,),
+    }
+
+    predicate = get_active_filters()
+
+    matching = sample_analysis_result._replace(project_type=project_type)
+    assert predicate(matching) is True, f"{project_type} deveria casar consigo mesmo."
+
+    non_matching = sample_analysis_result._replace(project_type="a_value_never_emitted")
+    assert predicate(non_matching) is False
+
+
+@pytest.mark.parametrize("pr_nature", PR_NATURES)
+@patch("ui.sidebar_filters.st")
+def test_every_pr_nature_selection_matches_canonical_record(
+    mock_st, pr_nature, sample_analysis_result
+):
+    """Idem para a natureza da contribuição, incluindo `other` e `unknown`."""
+    mock_st.session_state = {
+        **_empty_session_state(),
+        "selected_natures": (pr_nature,),
+    }
+
+    predicate = get_active_filters()
+
+    matching = sample_analysis_result._replace(pr_nature=pr_nature)
+    assert predicate(matching) is True, f"{pr_nature} deveria casar consigo mesmo."
+
+    non_matching = sample_analysis_result._replace(pr_nature="a_value_never_emitted")
+    assert predicate(non_matching) is False
+
+
+@pytest.mark.parametrize("clarity_level", CLARITY_LEVELS)
+@patch("ui.sidebar_filters.st")
+def test_every_clarity_level_selection_matches_canonical_record(
+    mock_st, clarity_level, sample_analysis_result
+):
+    """Idem para o nível de clareza, incluindo o sentinela `unknown`."""
+    mock_st.session_state = {
+        **_empty_session_state(),
+        "selected_clarity": (clarity_level,),
+    }
+
+    predicate = get_active_filters()
+
+    matching = sample_analysis_result._replace(clarity_level=clarity_level)
+    assert predicate(matching) is True, f"{clarity_level} deveria casar consigo mesmo."
+
+    non_matching = sample_analysis_result._replace(
+        clarity_level="a_value_never_emitted"
+    )
+    assert predicate(non_matching) is False
+
+
+@pytest.mark.parametrize("language", LANGUAGES)
+@patch("ui.sidebar_filters.st")
+def test_every_language_selection_matches_inferred_language(
+    mock_st, language, sample_analysis_result
+):
+    """
+    Toda linguagem ofertada na sidebar deve casar com o valor que
+    `_infer_language_from_path` produz para ela.
+    """
+    mock_st.session_state = {
+        **_empty_session_state(),
+        "selected_languages": (language,),
+    }
+
+    predicate = get_active_filters()
+
+    matching = sample_analysis_result._replace(language=language)
+    assert predicate(matching) is True, f"{language} deveria casar consigo mesma."
+
+    non_matching = sample_analysis_result._replace(language=None)
+    assert predicate(non_matching) is False
 
 
 @patch("ui.sidebar_filters.st")
