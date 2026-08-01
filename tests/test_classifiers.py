@@ -9,6 +9,8 @@ Cobertura:
     - Lazy evaluation e generators
 """
 
+from unittest.mock import patch
+
 import pytest
 from core.models.pr_record import PRRecord
 from services.classifiers import (

@@ -58,18 +58,19 @@ _LANGUAGE_VARIANTS = {
     "rust": frozenset(["rust", "rs"]),
     "cpp": frozenset(["c++", "cpp", "cxx"]),
     "c": frozenset(["c"]),
-    "ruby":   frozenset(["ruby", "rb"]),
-    "php":    frozenset(["php"]),
-    "dart":   frozenset(["dart"]),
+    "ruby": frozenset(["ruby", "rb"]),
+    "php": frozenset(["php"]),
+    "dart": frozenset(["dart"]),
     "kotlin": frozenset(["kotlin", "kt"]),
-    "swift":  frozenset(["swift"]),
-    "scala":  frozenset(["scala"]),
+    "swift": frozenset(["swift"]),
+    "scala": frozenset(["scala"]),
 }
 
 
 # ---------------------------------------------------------------------------
 # Funções Puras de Normalização
 # ---------------------------------------------------------------------------
+
 
 @functools.lru_cache(maxsize=256)
 def normalize_language(text: str | None) -> str | None:
@@ -119,7 +120,7 @@ def normalize_label(label: str, field: str) -> str:
     """
     if not label:
         return "other"
-        
+
     normalized_label = label.strip().lower().replace("-", "_")
 
     # Seleciona vocabulário correto baseado no campo

@@ -26,14 +26,6 @@ from core.aggregations.counters import (
     count_by_pr_nature,
 )
 
-from core.transforms.filtering import (
-    apply_filters,
-)
-
-from ui.sidebar_filters import (
-    get_active_filters,
-)
-
 from ui.charts import (
     bar_chart_by_category,
     distribution_chart_from_bins,
@@ -257,31 +249,26 @@ def render_overview(
 ) -> None:
     """
     Renderiza dashboard overview.
+
+    Args:
+        records: Análise já recortada pelo Filtro de Visualização em main.py
+            (ADR-0003) — a página não reaplica o filtro.
     """
 
-    active_filter = get_active_filters()
-
-    filtered_records = tuple(
-        apply_filters(
-            (active_filter,),
-            records,
-        )
-    )
-
     language_data = count_by_language(
-        filtered_records,
+        records,
     )
 
     project_type_data = count_by_project_type(
-        filtered_records,
+        records,
     )
 
     pr_nature_data = count_by_pr_nature(
-        filtered_records,
+        records,
     )
 
     total_records = _count_total_records(
-        filtered_records,
+        records,
     )
 
     render_header()
@@ -299,7 +286,7 @@ def render_overview(
     )
 
     render_description_distributions(
-        filtered_records,
+        records,
     )
 
     render_footer()

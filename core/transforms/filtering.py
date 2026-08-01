@@ -45,6 +45,11 @@ def by_project_type(project_types: tuple[str, ...]) -> Predicate:
     return lambda record: (record.project_type or "").lower() in allowed
 
 
+def has_project_type(project_type: str) -> Predicate:
+    """Wrapper para by_project_type que aceita um tipo de projeto individual."""
+    return by_project_type((project_type,))
+
+
 def by_pr_nature(pr_natures: tuple[str, ...]) -> Predicate:
     """
     Cria um predicado para filtrar registros por natureza da contribuição.
@@ -64,6 +69,11 @@ def has_pr_nature(pr_nature: str) -> Predicate:
 def by_clarity_level(clarity_levels: tuple[str, ...]) -> Predicate:
     allowed = frozenset(map(str.lower, clarity_levels))
     return lambda record: (record.clarity_level or "").lower() in allowed
+
+
+def has_clarity_level(clarity_level: str) -> Predicate:
+    """Wrapper para by_clarity_level que aceita um nível de clareza individual."""
+    return by_clarity_level((clarity_level,))
 
 
 def is_in_date_range(

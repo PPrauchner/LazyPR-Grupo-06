@@ -41,7 +41,12 @@ from itertools import groupby
 from operator import attrgetter
 from typing import Generator, Iterable
 
-from core.models.analysis_result import AnalysisResult
+from core.models.analysis_result import (
+    UNKNOWN_CLARITY_LEVEL,
+    UNKNOWN_PR_NATURE,
+    UNKNOWN_PROJECT_TYPE,
+    AnalysisResult,
+)
 from core.models.pr_record import PRRecord
 from core.transforms.normalizing import (
     calculate_char_count,
@@ -65,6 +70,14 @@ logger = logging.getLogger(__name__)
 _DEFAULT_PROJECT_TYPE = "other"
 _DEFAULT_PR_NATURE = "other"
 _DEFAULT_CLARITY_LEVEL = "unknown"
+
+# Sentinela por campo, para reconhecer a classificação já degradada pelo
+# llm_client após uma recusa de schema (ADR-0004).
+_UNKNOWN_BY_FIELD = {
+    "project_type": UNKNOWN_PROJECT_TYPE,
+    "pr_nature": UNKNOWN_PR_NATURE,
+    "clarity_level": UNKNOWN_CLARITY_LEVEL,
+}
 
 
 # ---------------------------------------------------------------------------
@@ -97,6 +110,13 @@ def _extract_field_from_json(raw_response: str, field: str) -> str:
         raw_value = parsed[field]
         if not raw_value:
             return _get_default_for_field(field)
+
+        # O sentinela chega pronto do llm_client quando a recusa de schema
+        # degradou a classificação; normalize_label() não o reconhece como
+        # vocabulário válido e o rebaixaria para "other" (ADR-0004).
+        sentinel = _UNKNOWN_BY_FIELD.get(field)
+        if sentinel is not None and str(raw_value).strip().lower() == sentinel:
+            return sentinel
 
         # Normalizar via normalize_label
         normalized = normalize_label(str(raw_value).strip(), field)

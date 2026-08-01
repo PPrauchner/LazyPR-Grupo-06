@@ -45,9 +45,7 @@ def test_global_language_filter():
 
     filtered = tuple(
         apply_filters(
-            (
-                by_language(("Python",)),
-            ),
+            (by_language(("Python",)),),
             records,
         )
     )
@@ -70,9 +68,7 @@ def test_global_clarity_filter():
 
     filtered = tuple(
         apply_filters(
-            (
-                by_clarity_level(("excellent",)),
-            ),
+            (by_clarity_level(("excellent",)),),
             records,
         )
     )
@@ -133,9 +129,7 @@ def test_global_project_type_filter():
 
     filtered = tuple(
         apply_filters(
-            (
-                by_project_type(("Framework",)),
-            ),
+            (by_project_type(("Framework",)),),
             records,
         )
     )

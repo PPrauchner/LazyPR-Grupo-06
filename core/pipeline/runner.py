@@ -22,7 +22,7 @@ Não deve:
 
 Relacionado a:
     - Issue 01 (processamento sob demanda do dataset)
-    - Issue 08 (ativação/desativação de filtros por etapa)
+    - ADR 0003 (o Filtro de Visualização não é Etapa do Pipeline)
     - Regra Geral 05 (pipeline configurável com funções de ordem superior)
     - Regra Funcional 04 (avaliação preguiçosa via geradores)
     - Conceito-Chave 01 (lazy evaluation)
@@ -35,7 +35,7 @@ from typing import Callable, Iterable, NamedTuple, Generator
 from core.models.pr_record import PRRecord
 from core.models.analysis_result import AnalysisResult
 from core.pipeline.composer import pipe
-from core.transforms.filtering import apply_filters
+from core.transforms.filtering import Predicate, apply_filters
 
 # ---------------------------------------------------------------------------
 # Métricas de Execução (Imutável)
@@ -43,7 +43,18 @@ from core.transforms.filtering import apply_filters
 
 
 class PipelineMetrics(NamedTuple):
-    """Métricas da execução do pipeline."""
+    """Métricas da execução do pipeline.
+
+    Attributes:
+        records_processed: Registros que atravessaram o pipeline.
+        records_filtered: Registros descartados pelos predicados recebidos em
+            `PipelineConfig.filter_predicates`. Vale 0 no caminho de análise
+            do upload, que nunca passa predicados — o Filtro de Visualização
+            da sidebar recorta a Análise já carregada e não conta aqui
+            (ADR 0003).
+        stages_applied: Nomes das etapas habilitadas, em ordem.
+        total_time_ms: Tempo total de execução em milissegundos.
+    """
 
     records_processed: int
     records_filtered: int
@@ -68,11 +79,22 @@ EnrichmentStage = Callable[[Iterable[PRRecord]], Generator[AnalysisResult, None,
 
 
 class PipelineConfig(NamedTuple):
-    """Configuração do pipeline com etapas ativáveis."""
+    """Configuração do pipeline com etapas ativáveis.
+
+    Attributes:
+        enable_cleaning: Habilita a limpeza textual dos registros.
+        enable_normalization: Habilita a normalização de campos canônicos.
+        filter_predicates: Predicados do Filtro de Visualização recebidos
+            **por argumento**. O recorte roda apenas quando esta tupla não é vazia;
+            o padrão vazio garante que a Análise persistida cubra o dataset
+            inteiro (ADR 0003 e Regra Geral 04).
+        enable_classification: Habilita o enriquecimento semântico via LLM.
+        enable_aggregation: Agregação é opcional (feita nas views).
+    """
 
     enable_cleaning: bool = True
     enable_normalization: bool = True
-    enable_filtering: bool = True
+    filter_predicates: tuple[Predicate, ...] = ()
     enable_classification: bool = True
     enable_aggregation: bool = False  # Agregação é opcional (para views)
 
@@ -92,13 +114,16 @@ def run_pipeline(
     1. **Normalização** (core/transforms/normalizing.py)
        - Normaliza language
        - Calcula char_count e word_count
-    2. **Filtragem** (core/transforms/filtering.py)
-       - Aplica predicados customizáveis
-       - Retorna PRRecord intactos que passam
-    3. **Classificação** (services/classifiers.py)
+    2. **Classificação** (services/classifiers.py)
        - Batching por repositório
        - Cache dois níveis (memória + disco)
        - Retorna AnalysisResult enriquecido
+    Recorte opcional, que **não** é Etapa (ADR 0003):
+    - **Filtro de Visualização** (core/transforms/filtering.py)
+      - Só roda se `config.filter_predicates` não for vazia
+      - Predicados chegam por argumento, nunca de estado global
+      - Não é usado no caminho do upload: o recorte da sidebar é aplicado sobre
+        a Análise já carregada
 
     Implementação pura via composição funcional:
     - Lazy evaluation com generators
@@ -145,19 +170,7 @@ def run_pipeline(
         # (nota: normalize_pr_record não filtra, então não precisa ser generator)
         stream = (normalize_pr_record(record) for record in stream)
 
-    # Etapa 3: Filtragem (quando habilitada)
-    if config.enable_filtering:
-        from ui.sidebar_filters import get_active_filters
-        from core.transforms.filtering import apply_filters
-
-        predicate = get_active_filters()
-
-        stream = apply_filters(
-            [predicate],
-            stream,
-        )
-
-    # Etapa 4: Classificação (core da Phase 2/3)
+    # Etapa 3: Classificação (core da Phase 2/3)
     if config.enable_classification:
         # Aplicar classificadores via composição
         # classify_project_type já retorna Generator[AnalysisResult]
@@ -188,6 +201,15 @@ def run_pipeline(
             )
 
         stream = (_stub_analysis_result(record) for record in stream)
+
+    # Filtro de Visualização — não é Etapa (ADR 0003); só roda quando o chamador
+    # passa predicados por argumento, e depois da classificação porque Predicate
+    # avalia AnalysisResult.
+    if config.filter_predicates:
+        stream = apply_filters(
+            config.filter_predicates,
+            stream,
+        )
 
     # Etapa 4: Agregação (opcional, apenas para views específicas)
     # Se habilitada, seria aplicada aqui via core/aggregations/*

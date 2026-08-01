@@ -15,10 +15,6 @@ from core.aggregations.correlations import (
     clarity_by_pr_nature,
 )
 
-from core.transforms.filtering import (
-    apply_filters,
-)
-
 from ui.charts import (
     correlation_heatmap,
 )
@@ -26,10 +22,6 @@ from ui.charts import (
 from ui.components import (
     chart_container_start,
     chart_container_end,
-)
-
-from ui.sidebar_filters import (
-    get_active_filters,
 )
 
 
@@ -45,27 +37,22 @@ def render_correlation_dashboard(
 ) -> None:
     """
     Renderiza dashboard de correlação multidimensional.
+
+    Args:
+        records: Análise já recortada pelo Filtro de Visualização em main.py
+            (ADR-0003) — a página não reaplica o filtro.
     """
 
-    active_filter = get_active_filters()
-
-    filtered_records = tuple(
-        apply_filters(
-            (active_filter,),
-            records,
-        )
-    )
-
     language_matrix = clarity_by_language(
-        filtered_records,
+        records,
     )
 
     project_matrix = clarity_by_project_type(
-        filtered_records,
+        records,
     )
 
     nature_matrix = clarity_by_pr_nature(
-        filtered_records,
+        records,
     )
 
     st.title("Correlação Multidimensional")

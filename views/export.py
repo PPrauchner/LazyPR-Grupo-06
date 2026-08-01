@@ -24,25 +24,45 @@ import streamlit as st
 from core.aggregations.counters import count_by
 from ui.components import data_table, download_buttons, metric_card, status_banner
 
+
 def render_export_page(records=None) -> None:
     """
     Renderiza a página de exportação.
+
+    Args:
+        records: Análise já recortada pelo Filtro de Visualização em main.py
+            (ADR-0003) — a página não reaplica o recorte.
     """
 
     st.title("💾 Exportar Resultados")
 
-    if "analysis_results" not in st.session_state:
+    # Recebe a Análise já recortada pelo Filtro de Visualização (ADR 0003);
+    # ler st.session_state aqui exportaria o conjunto inteiro, ignorando a
+    # sidebar.
+    results = tuple(records or ())
 
-        status_banner(
-            "Nenhum dado processado disponível. "
-            "Por favor, retorne à página de Upload e inicie uma análise.",
-            status_type="warning",
-        )
+    # A guarda verifica o que a página de fato exporta. Sem Análise carregada e
+    # recorte vazio são situações distintas: só a segunda se resolve na sidebar.
+    if not results:
+
+        if st.session_state.get("analysis_results"):
+
+            status_banner(
+                "O Filtro de Visualização atual não casou com nenhum PR. "
+                "Ajuste ou limpe os filtros na barra lateral para exportar.",
+                status_type="info",
+            )
+
+        else:
+
+            status_banner(
+                "Nenhum dado processado disponível. "
+                "Por favor, retorne à página de Upload e inicie uma análise.",
+                status_type="warning",
+            )
 
         st.stop()
         return
-
-    results = tuple(st.session_state["analysis_results"])
 
     st.subheader("Resumo do Arquivo")
 

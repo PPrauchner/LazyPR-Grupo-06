@@ -61,8 +61,8 @@ estilo — inclusive sobre as regras deste arquivo.
 aceitar.** Ao encontrar uma, nomeie a regra numerada violada.
 
 Distinga os dois níveis: **Regras** são obrigatórias; **Dicas de Implementação**
-são opcionais. Usar o SDK do Groq direto em vez de Agno descumpre a Dica 05 — não
-uma regra.
+são opcionais. Usar o SDK do Groq direto em vez de Agno descumpriria a Dica 05 —
+não uma regra.
 
 ### Pipeline (Regra Geral 05) — inegociável
 
@@ -108,11 +108,14 @@ esclarece:
 | Python | 3.12 | fixado em `.python-version` |
 | Dependências | **uv** (`uv.lock`) | nunca pip, poetry ou conda |
 | Interface | Streamlit | Regra Geral 08 exige interface gráfica; Dica 04 sugere Streamlit |
-| LLM | Groq | Dica 07 — acesso gratuito; 30 RPM no plano free |
+| LLM | Agno + backend Groq | Dica 05 (Agno) e Dica 07 — acesso gratuito; 30 RPM no plano free |
 | Dataset | `pelmers/github-public-pull-request-comments` | fixado pela Regra Geral 01 |
 
-`agno` está declarado no `pyproject.toml` e é a Dica 05 do enunciado, mas não é
-importado por nenhum módulo.
+As chamadas passam por um `Agent` do Agno com `output_schema` Pydantic
+([ADR-0004](../../docs/adr/0004-migracao-das-chamadas-de-llm-para-agno.md)). O
+schema vive em `services/` — `core/` não importa pydantic nem agno. `groq` segue
+declarado no `pyproject.toml` porque o Agno o usa internamente; nenhum módulo
+nosso o importa direto.
 
 ### Persistência (Regra Geral 04) — inegociável
 

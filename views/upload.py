@@ -71,11 +71,6 @@ def render_upload_page() -> None:
                     None,
                 )
 
-                st.session_state.pop(
-                    "pipeline_stats",
-                    None,
-                )
-
                 st.rerun()
 
         return
@@ -135,13 +130,6 @@ def render_upload_page() -> None:
 
             st.session_state["analysis_results"] = results
 
-            st.session_state["pipeline_stats"] = {
-                "loaded": len(results),
-                "cleaned": len(results),
-                "normalized": len(results),
-                "classified": len(results),
-            }
-
             st.session_state["analysis_ready"] = True
             st.rerun()
 
@@ -160,6 +148,10 @@ def render_upload_page() -> None:
                 enable_classification=True,
             )
 
+            # A recusa de schema não interrompe a Análise: o llm_client degrada
+            # o registro recusado para o sentinela `unknown` e registra a
+            # recusa em log, para que os demais registros cheguem ao fim e
+            # sejam persistidos (ADR-0004).
             resultados_lazy = run_pipeline(
                 source_stream,
                 config,
@@ -173,13 +165,6 @@ def render_upload_page() -> None:
         )
 
         st.session_state["analysis_results"] = resultados_finais
-
-        st.session_state["pipeline_stats"] = {
-            "loaded": len(resultados_finais),
-            "cleaned": len(resultados_finais),
-            "normalized": len(resultados_finais),
-            "classified": len(resultados_finais),
-        }
 
         st.session_state["analysis_ready"] = True
 

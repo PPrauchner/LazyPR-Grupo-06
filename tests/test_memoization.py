@@ -3,6 +3,7 @@ tests/test_memoization.py
 ==========================
 Testes unitários para módulo de memoization.
 """
+
 import threading
 import tempfile
 from typing import Generator
@@ -35,6 +36,154 @@ def temp_cache_dir(monkeypatch):
 
         importlib.reload(services.storage)
         yield tmpdir
+
+
+class TestCachedClassifyNamespace:
+    """cached_classify() vive no espaço de nomes das classificações por repo."""
+
+    def _result(self) -> AnalysisResult:
+        """Constrói um AnalysisResult mínimo para os testes de namespace."""
+        return AnalysisResult(
+            id=1,
+            html_url="https://github.com/repo/test/pull/10#comment-1",
+            repo="repo/test",
+            path="src/main.py",
+            body="Body",
+            diff_hunk="@@ -10,5 +10,5 @@",
+            author="author",
+            author_association="CONTRIBUTOR",
+            commit_id="abc123",
+            line=10,
+            language="Python",
+            created_at="2024-01-01",
+            project_type="library",
+            pr_nature="feature",
+            clarity_level="good",
+            char_count=4,
+            word_count=1,
+        )
+
+    def test_repo_classification_survives_analysis_version_bump(
+        self, temp_cache_dir, monkeypatch
+    ):
+        """Bump da versão da Análise não força reclassificação pelo LLM."""
+        from services import storage
+
+        cache_key = "repo_batch_hash"
+        call_count = {"n": 0}
+
+        def classify_fn() -> Generator[AnalysisResult, None, None]:
+            call_count["n"] += 1
+            yield self._result()
+
+        # Primeira execução: cache miss, chama a "LLM" e persiste.
+        list(memoization.cached_classify(classify_fn, cache_key))
+        assert call_count["n"] == 1
+
+        monkeypatch.setattr(storage, "CACHE_SCHEMA_VERSION", "v99")
+
+        # Segunda execução após o bump: ainda é hit, sem nova chamada.
+        cached = list(memoization.cached_classify(classify_fn, cache_key))
+        assert call_count["n"] == 1
+        assert [r.id for r in cached] == [1]
+
+
+class TestCachedClassifyCorruptedCache:
+    """Cache de repositório corrompido recomputa, em vez de truncar a Análise."""
+
+    def _result(self, result_id: int = 1) -> AnalysisResult:
+        """Constrói um AnalysisResult mínimo para os testes de corrupção."""
+        return AnalysisResult(
+            id=result_id,
+            html_url="https://github.com/repo/test/pull/10#comment-1",
+            repo="repo/test",
+            path="src/main.py",
+            body="Body",
+            diff_hunk="@@ -10,5 +10,5 @@",
+            author="author",
+            author_association="CONTRIBUTOR",
+            commit_id="abc123",
+            line=10,
+            language="Python",
+            created_at="2024-01-01",
+            project_type="library",
+            pr_nature="feature",
+            clarity_level="good",
+            char_count=4,
+            word_count=1,
+        )
+
+    def _write_raw_repo_cache(self, cache_key: str, content: str) -> None:
+        """Grava conteúdo cru no cache de classificações por repositório."""
+        from services import storage
+
+        cache_path = storage._cache_path(
+            cache_key, namespace=storage.REPO_CLASSIFICATION_NAMESPACE
+        )
+        cache_path.parent.mkdir(parents=True, exist_ok=True)
+        with open(cache_path, "w", encoding="utf-8") as f:
+            f.write(content)
+
+    def test_corrupted_cache_triggers_reclassification(self, temp_cache_dir):
+        """JSON inválido não vira hit vazio: a classificação roda de novo."""
+        cache_key = "repo_hash_corrompido"
+        self._write_raw_repo_cache(cache_key, "{ nao_e_json: [")
+
+        call_count = {"n": 0}
+
+        def classify_fn() -> Generator[AnalysisResult, None, None]:
+            call_count["n"] += 1
+            yield self._result(1)
+
+        results = list(memoization.cached_classify(classify_fn, cache_key))
+
+        assert call_count["n"] == 1
+        assert [r.id for r in results] == [1]
+
+    def test_partially_malformed_cache_does_not_return_prefix(self, temp_cache_dir):
+        """Lista com um item bom e um quebrado não entrega o prefixo parcial."""
+        import json as _json
+
+        cache_key = "repo_hash_parcial"
+        self._write_raw_repo_cache(
+            cache_key,
+            _json.dumps(
+                [self._result(1)._asdict(), {"id": 2, "campo_estranho": "valor"}]
+            ),
+        )
+
+        call_count = {"n": 0}
+
+        def classify_fn() -> Generator[AnalysisResult, None, None]:
+            call_count["n"] += 1
+            yield self._result(10)
+            yield self._result(11)
+
+        results = list(memoization.cached_classify(classify_fn, cache_key))
+
+        # Nem o prefixo válido ([1]) nem um conjunto vazio: recomputou inteiro.
+        assert call_count["n"] == 1
+        assert [r.id for r in results] == [10, 11]
+
+    def test_corrupted_cache_is_overwritten_by_fresh_results(self, temp_cache_dir):
+        """Após recomputar, o cache corrompido é substituído por um íntegro."""
+        from services import storage
+
+        cache_key = "repo_hash_sobrescrito"
+        self._write_raw_repo_cache(cache_key, "lixo")
+
+        def classify_fn() -> Generator[AnalysisResult, None, None]:
+            yield self._result(42)
+
+        list(memoization.cached_classify(classify_fn, cache_key))
+
+        assert storage.has_cached_analysis(
+            cache_key, namespace=storage.REPO_CLASSIFICATION_NAMESPACE
+        )
+        cached = storage.read_results(
+            cache_key, namespace=storage.REPO_CLASSIFICATION_NAMESPACE
+        )
+        assert [r.id for r in cached] == [42]
 
 
 class TestCachedClassify:
@@ -289,14 +438,14 @@ class TestGetCacheStats:
         assert stats["misses"] == 3
         assert stats["hits"] == 2
         assert stats["total"] == 5
-        
+
+
 class TestMemoizationDiskCacheL2:
-    
 
     def test_cache_hit_on_disk_when_memory_empty(self, reset_cache, temp_cache_dir):
-        
+
         test_hash = "hash_disco_persistente"
-        
+
         resultado_simulado = AnalysisResult(
             id=99,
             html_url="https://github.com/repo/test/pull/99",
@@ -319,6 +468,7 @@ class TestMemoizationDiskCacheL2:
 
         # Simula o encerramento de uma sessão anterior salvando diretamente no disco
         from services import storage
+
         storage.save_results(test_hash, [resultado_simulado])
 
         call_count = 0
@@ -332,7 +482,9 @@ class TestMemoizationDiskCacheL2:
         resultados = list(memoization.cached_classify(mock_classify_caro, test_hash))
 
         # Asserções críticas
-        assert call_count == 0  # A função de classificação da LLM NUNCA deve ser chamada
+        assert (
+            call_count == 0
+        )  # A função de classificação da LLM NUNCA deve ser chamada
         assert len(resultados) == 1
         assert resultados[0].id == 99
 
@@ -340,13 +492,16 @@ class TestMemoizationDiskCacheL2:
         stats = memoization.get_cache_stats()
         assert stats["hits"] == 1
         assert stats["misses"] == 0
-        
+
+
 import threading
 
-class TestMemoizationAdvancedResilience:
-    
 
-    def test_cached_classify_does_not_cache_exceptions(self, reset_cache, temp_cache_dir):
+class TestMemoizationAdvancedResilience:
+
+    def test_cached_classify_does_not_cache_exceptions(
+        self, reset_cache, temp_cache_dir
+    ):
         """Garante que se a LLM lançar exceção (ex: Timeout), o erro sobe e NADA vai para o cache."""
         test_hash = "hash_erro_api"
         call_count = 0
@@ -362,18 +517,19 @@ class TestMemoizationAdvancedResilience:
             list(memoization.cached_classify(mock_classify_failing, test_hash))
 
         assert call_count == 1
-        
+
         # O estado não deve ter sido alterado: não tem no cache em memória
         assert test_hash not in memoization._in_memory_cache
-        
+
         # Também não pode ter salvo um arquivo sujo/vazio no disco
         from services.storage import has_cached_analysis
+
         assert not has_cached_analysis(test_hash)
 
     def test_cache_stats_thread_safety(self, reset_cache, temp_cache_dir):
         """Testa se os Locks protegem a atualização das estatísticas do cache em acessos concorrentes."""
         num_threads = 100
-        
+
         def simulate_cache_access():
             # Simula um "miss" direto atualizando as stats usando a função interna
             memoization._update_stats(hit=False)
@@ -396,12 +552,12 @@ class TestMemoizationAdvancedResilience:
         """Verifica o comportamento de design: limpar a memória não zera o histórico de estatísticas."""
         memoization._update_stats(hit=True)
         memoization._update_stats(hit=False)
-        
+
         assert memoization.get_cache_stats()["total"] == 2
-        
+
         # Limpa o cache L1
         memoization.clear_cache()
-        
+
         # As estatísticas de vida útil da aplicação devem se manter
         stats = memoization.get_cache_stats()
         assert stats["total"] == 2

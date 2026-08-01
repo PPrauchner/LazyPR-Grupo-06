@@ -9,15 +9,18 @@ dependencies = [
     "agno>=2.6.5",
     "groq>=1.2.0",
     "plotly>=6.7.0",
+    "pydantic>=2.13",
     "python-dotenv>=1.2.2",
     "streamlit>=1.57.0",
 ]
 
 [tool.black]
 line-length = 88
+target-version = ["py312"]
 
 [dependency-groups]
 dev = [
+    "black>=25.1.0",
     "pytest>=9.0.3",
     "pytest-cov>=7.1.0",
 ]

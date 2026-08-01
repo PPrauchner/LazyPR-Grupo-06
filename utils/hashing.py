@@ -73,6 +73,7 @@ def hash_file_stream(stream: IO[str]) -> Tuple[str, Generator[str, None, None]]:
 
     return digest, (line for line in stream)
 
+
 def hash_record(pr_record: PRRecord) -> str:
     """Gera chave SHA-256 única de um PRRecord.
 

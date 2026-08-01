@@ -37,6 +37,30 @@ from typing import Generator
 
 from core.models.analysis_result import AnalysisResult
 
+# Espaços de nomes do cache. Cada um vira um subdiretório de CACHE_DIR e tem a
+# própria versão de esquema, para que um bump atinja só o cache afetado.
+#
+# - ANALYSIS_NAMESPACE: a Análise do dataset, indexada pelo hash do arquivo.
+# - REPO_CLASSIFICATION_NAMESPACE: as classificações de LLM por repositório,
+#   gravadas por utils/memoization.py::cached_classify().
+ANALYSIS_NAMESPACE = "analysis"
+REPO_CLASSIFICATION_NAMESPACE = "repo-classification"
+
+# Versão do esquema da Análise persistida. Trocar este valor invalida as Análises
+# existentes: elas passam a ser gravadas e procuradas sob outro nome de arquivo, e
+# as antigas simplesmente dão miss e são reprocessadas sozinhas.
+#
+# "v2" invalida as Análises gravadas antes da issue #82, quando os filtros da
+# sidebar podiam recortar o stream antes da persistência — uma Análise truncada
+# ficava indistinguível de uma completa. Reprocessar não exige ação humana:
+# basta subir o dataset de novo, que ele será analisado por inteiro.
+CACHE_SCHEMA_VERSION = "v2"
+
+# Versão do esquema das classificações por repositório. Independente da Análise:
+# esse cache nunca esteve truncado (o Filtro de Visualização recortava o stream
+# depois dele), e descartá-lo custa cota do Groq à toa (issue #101).
+REPO_CLASSIFICATION_SCHEMA_VERSION = "v1"
+
 
 def _get_cache_dir() -> Path:
     """Obtém o diretório de cache configurável.
@@ -50,50 +74,127 @@ def _get_cache_dir() -> Path:
     return Path(cache_dir)
 
 
-def has_cached_analysis(repo_hash: str) -> bool:
-    """Verifica se análise já foi persistida para um repositório.
+def _schema_version(namespace: str) -> str:
+    """Obtém a versão de esquema vigente de um espaço de nomes.
 
     Args:
-        repo_hash: Hash SHA-256 único do repositório.
+        namespace: Espaço de nomes do cache.
 
     Returns:
-        True se arquivo de cache existe e é válido, False caso contrário.
+        Versão de esquema aplicada ao nome dos arquivos daquele espaço.
+
+    Raises:
+        KeyError: Se o espaço de nomes não for conhecido. Falhar alto evita que
+            um namespace novo ou digitado errado herde em silêncio a versão de
+            outro e passe a ler o cache errado.
     """
-    cache_path = _get_cache_dir() / f"{repo_hash}.json"
-    return cache_path.exists() and cache_path.is_file()
+    # Montado a cada chamada de propósito: as versões são lidas dos globais do
+    # módulo no momento do uso, e não congeladas na importação.
+    versions = {
+        ANALYSIS_NAMESPACE: CACHE_SCHEMA_VERSION,
+        REPO_CLASSIFICATION_NAMESPACE: REPO_CLASSIFICATION_SCHEMA_VERSION,
+    }
+    return versions[namespace]
 
 
-def load_results(repo_hash: str) -> Generator[AnalysisResult, None, None]:
-    """Carrega análises persistidas de um repositório do cache.
-
-    Lê arquivo JSON e reconstitui AnalysisResult.
-    Em caso de arquivo inválido ou inexistente, retorna gerador vazio.
+def _cache_path(
+    repo_hash: str, suffix: str = "json", namespace: str = ANALYSIS_NAMESPACE
+) -> Path:
+    """Monta o caminho versionado do arquivo de cache num espaço de nomes.
 
     Args:
-        repo_hash: Hash SHA-256 único do repositório.
+        repo_hash: Hash SHA-256 único do dataset ou do batch de repositório.
+        suffix: Extensão do arquivo ("json" para o definitivo, "tmp.json"
+            para o temporário da escrita atômica).
+        namespace: Espaço de nomes do cache (subdiretório de CACHE_DIR).
 
-    Yields:
-        AnalysisResult reconstituído do arquivo JSON.
+    Returns:
+        Caminho do arquivo, sob o subdiretório do namespace e prefixado pela
+        versão de esquema daquele namespace.
     """
-    cache_path = _get_cache_dir() / f"{repo_hash}.json"
+    version = _schema_version(namespace)
+    return _get_cache_dir() / namespace / f"{version}-{repo_hash}.{suffix}"
 
-    if not cache_path.exists():
-        return
+
+def read_results(
+    repo_hash: str, namespace: str = ANALYSIS_NAMESPACE
+) -> tuple[AnalysisResult, ...] | None:
+    """Lê o cache de um hash por inteiro, distinguindo vazio de ilegível.
+
+    O arquivo é lido e reconstituído **integralmente** antes de qualquer valor
+    ser devolvido: ou o cache inteiro é válido, ou ele é um miss. Isso impede
+    que um item malformado no meio da lista entregue ao chamador um prefixo
+    parcial disfarçado de conjunto completo — que depois seria persistido como
+    se fosse a Análise inteira.
+
+    Args:
+        repo_hash: Hash SHA-256 único do dataset ou do batch de repositório.
+        namespace: Espaço de nomes do cache a consultar.
+
+    Returns:
+        Tupla com os resultados persistidos (possivelmente vazia, se o cache
+        gravado era mesmo vazio), ou None se o cache está ausente, ilegível ou
+        malformado — caso em que o chamador deve recomputar.
+    """
+    cache_path = _cache_path(repo_hash, namespace=namespace)
+
+    if not (cache_path.exists() and cache_path.is_file()):
+        return None
 
     try:
         with open(cache_path, "r", encoding="utf-8") as f:
             data = json.load(f)
 
-        if isinstance(data, list):
-            # Laço justificado: yield com **unpacking exige generator function explícita;
-            # yield from map(lambda d: AnalysisResult(**d), data) seria equivalente mas menos legível.
-            for item in data:
-                yield AnalysisResult(**item)
-    except (json.JSONDecodeError, KeyError, TypeError):
-        return
+        if not isinstance(data, list):
+            return None
+
+        return tuple(AnalysisResult(**item) for item in data)
+    except (OSError, json.JSONDecodeError, KeyError, TypeError, ValueError):
+        return None
 
 
-def save_results(repo_hash: str, results: list[AnalysisResult]) -> None:
+def has_cached_analysis(repo_hash: str, namespace: str = ANALYSIS_NAMESPACE) -> bool:
+    """Verifica se há análise persistida **e legível** para um hash.
+
+    Existir arquivo e ser legível são perguntas diferentes: um cache corrompido
+    que passasse por hit viraria um conjunto truncado de registros. Por isso o
+    predicado valida o conteúdo, não apenas a existência.
+
+    Args:
+        repo_hash: Hash SHA-256 único do repositório.
+        namespace: Espaço de nomes do cache a consultar.
+
+    Returns:
+        True se o arquivo de cache existe e pôde ser lido por inteiro, False
+        caso contrário.
+    """
+    return read_results(repo_hash, namespace=namespace) is not None
+
+
+def load_results(
+    repo_hash: str, namespace: str = ANALYSIS_NAMESPACE
+) -> Generator[AnalysisResult, None, None]:
+    """Carrega análises persistidas de um repositório do cache.
+
+    Lê arquivo JSON e reconstitui AnalysisResult.
+    Em caso de arquivo inválido ou inexistente, retorna gerador vazio — sem
+    nunca emitir um prefixo parcial de um cache corrompido (ver read_results).
+
+    Args:
+        repo_hash: Hash SHA-256 único do repositório.
+        namespace: Espaço de nomes do cache a consultar.
+
+    Yields:
+        AnalysisResult reconstituído do arquivo JSON.
+    """
+    yield from read_results(repo_hash, namespace=namespace) or ()
+
+
+def save_results(
+    repo_hash: str,
+    results: list[AnalysisResult],
+    namespace: str = ANALYSIS_NAMESPACE,
+) -> None:
     """Salva análises em arquivo JSON com escrita atômica.
 
     Escreve para arquivo temporário e renomeia atomicamente
@@ -102,12 +203,12 @@ def save_results(repo_hash: str, results: list[AnalysisResult]) -> None:
     Args:
         repo_hash: Hash SHA-256 único do repositório.
         results: Lista de AnalysisResult a persistir.
+        namespace: Espaço de nomes do cache em que gravar.
     """
-    cache_dir = _get_cache_dir()
-    cache_dir.mkdir(parents=True, exist_ok=True)
+    cache_path = _cache_path(repo_hash, namespace=namespace)
+    temp_path = _cache_path(repo_hash, suffix="tmp.json", namespace=namespace)
 
-    cache_path = cache_dir / f"{repo_hash}.json"
-    temp_path = cache_dir / f"{repo_hash}.tmp.json"
+    cache_path.parent.mkdir(parents=True, exist_ok=True)
 
     serialized = [result._asdict() for result in results]
 

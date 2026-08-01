@@ -44,23 +44,23 @@ from core.models.pr_record import PRRecord
 
 # Mapeamento de extensão de arquivo → linguagem canônica (mesma forma usada por normalize_language)
 _EXTENSION_TO_LANGUAGE: dict[str, str] = {
-    "py":   "python",
-    "js":   "javascript",
-    "ts":   "typescript",
+    "py": "python",
+    "js": "javascript",
+    "ts": "typescript",
     "java": "java",
-    "go":   "go",
-    "rb":   "ruby",
-    "php":  "php",
-    "rs":   "rust",
-    "cpp":  "cpp",
-    "cc":   "cpp",
-    "cxx":  "cpp",
-    "c":    "c",
-    "cs":    "csharp",
-    "dart":  "dart",
-    "kt":    "kotlin",
-    "jsx":   "javascript",
-    "tsx":   "typescript",
+    "go": "go",
+    "rb": "ruby",
+    "php": "php",
+    "rs": "rust",
+    "cpp": "cpp",
+    "cc": "cpp",
+    "cxx": "cpp",
+    "c": "c",
+    "cs": "csharp",
+    "dart": "dart",
+    "kt": "kotlin",
+    "jsx": "javascript",
+    "tsx": "typescript",
     "swift": "swift",
     "scala": "scala",
 }
@@ -149,7 +149,9 @@ def _map_csv_row(row: dict) -> PRRecord:
         author_association=row.get("author_association", ""),
         commit_id=row.get("commit_id", ""),
         line=int(raw_line) if raw_line else 0,
-        language=row.get("language") or _infer_language_from_path(row.get("path", "")) or None,
+        language=row.get("language")
+        or _infer_language_from_path(row.get("path", ""))
+        or None,
         created_at=row.get("created_at") or None,
     )
 

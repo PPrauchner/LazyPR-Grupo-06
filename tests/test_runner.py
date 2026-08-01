@@ -21,6 +21,7 @@ from core.pipeline.runner import (
     PipelineMetrics,
 )
 from core.pipeline.composer import pipe, compose, identity
+from core.transforms.filtering import is_language
 from utils.memoization import clear_cache
 
 # ---------------------------------------------------------------------------
@@ -46,20 +47,22 @@ class TestPipelineConfig:
         """Testa valores padrão de PipelineConfig."""
         config = PipelineConfig()
         assert config.enable_normalization is True
-        assert config.enable_filtering is True
+        # Sem predicados por padrão: a Análise cobre o dataset inteiro (#82)
+        assert config.filter_predicates == ()
         assert config.enable_classification is True
         assert config.enable_aggregation is False
 
     def test_pipeline_config_custom(self):
         """Testa configuração customizada."""
+        predicate = is_language("python")
         config = PipelineConfig(
             enable_normalization=True,
-            enable_filtering=False,
+            filter_predicates=(predicate,),
             enable_classification=True,
             enable_aggregation=True,
         )
         assert config.enable_normalization is True
-        assert config.enable_filtering is False
+        assert config.filter_predicates == (predicate,)
         assert config.enable_classification is True
         assert config.enable_aggregation is True
 

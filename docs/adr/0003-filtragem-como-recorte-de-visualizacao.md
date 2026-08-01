@@ -40,3 +40,34 @@ nunca lidos de estado global. `core/` deixa de importar `ui/`.
 O `CONTEXT.md` foi ajustado: **Etapa** não lista mais filtragem, **Análise** passa
 a dizer que cobre sempre o dataset inteiro, e **Filtro de Visualização** entrou
 como termo próprio.
+
+## Reprocessamento das Análises truncadas
+
+As Análises gravadas antes desta correção podem estar recortadas, e nada no
+arquivo distingue uma truncada de uma completa. Em vez de pedir que alguém apague
+`.cache` à mão, `services/storage.py` passa a versionar a chave de cache
+(`CACHE_SCHEMA_VERSION = "v2"`, prefixo do nome do arquivo): toda Análise antiga
+dá **miss** e é reanalisada na primeira vez que o dataset for submetido de novo.
+Nenhuma ação humana é necessária, e os arquivos antigos ficam inertes em disco —
+podem ser apagados a qualquer momento. Correções futuras que invalidem o formato
+seguem o mesmo caminho: incrementar a versão.
+
+### Escopo do versionamento: só a Análise (issue #101)
+
+O `CACHE_SCHEMA_VERSION` invalida **apenas a Análise do dataset**. As
+classificações de LLM por repositório, gravadas por
+`utils/memoization.py::cached_classify()`, nunca estiveram truncadas — o Filtro
+de Visualização recortava o stream depois delas — e descartá-las junto custaria
+cota do Groq à toa, contra a Regra Geral 04.
+
+Os dois caches passam a ocupar **subdiretórios distintos** de `CACHE_DIR`
+(`analysis/` e `repo-classification/`), cada um com a própria versão de esquema
+(`CACHE_SCHEMA_VERSION` e `REPO_CLASSIFICATION_SCHEMA_VERSION`). Escolhemos
+subdiretório em vez de sufixo na chave porque separa também fisicamente: dá para
+apagar um cache inteiro à mão sem tocar no outro. Um bump futuro atinge só o
+espaço afetado.
+
+A escrita permanece atômica (`.tmp` + `os.replace`) nos dois espaços, agora com
+o `mkdir` do subdiretório do namespace. A mudança de layout invalida uma vez os
+arquivos que estavam na raiz de `CACHE_DIR`; daí em diante, cada espaço evolui
+sozinho.

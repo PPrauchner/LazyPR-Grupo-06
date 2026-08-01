@@ -18,7 +18,6 @@ from core.transforms.cleaning import (
     BODY_TRUNCATION_SUFFIX,
 )
 
-
 # --- Testes das Funções Menores (Unitárias) ---
 
 
