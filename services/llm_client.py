@@ -26,6 +26,7 @@ Relacionado a:
     - Dica 07 (Groq/OpenRouter sem custo)
 """
 
+import json
 import os
 import re
 import time
@@ -46,6 +47,11 @@ except ImportError as exc:
 
 from pydantic import BaseModel
 
+from core.models.analysis_result import (
+    UNKNOWN_CLARITY_LEVEL,
+    UNKNOWN_PR_NATURE,
+    UNKNOWN_PROJECT_TYPE,
+)
 from core.models.pr_record import PRRecord
 
 # ---------------------------------------------------------------------------
@@ -60,8 +66,20 @@ _BACKOFF_FACTOR: float = 2.0
 # determinística — insistir só gasta cota e throttle (ver ADR-0004).
 _SCHEMA_MAX_ATTEMPTS: int = 2
 
-# Trecho do conteúdo recusado incluído na mensagem de erro, para atribuição.
+# Trecho do conteúdo recusado incluído no log, para atribuição.
 _REFUSED_CONTENT_PREVIEW: int = 200
+
+# Marcadores do erro que o Groq devolve quando o JSON mode não consegue
+# produzir resposta válida: HTTP 400 com `code: json_validate_failed`. Esse
+# desvio de schema sobe como exceção de `agent.run()`, não como conteúdo cru.
+# A detecção é por texto, e não por `isinstance`: capturar a exceção pelo tipo
+# exigiria importar o SDK do Groq (proibido neste projeto) ou uma exceção
+# interna do Agno. É frágil de propósito — o custo de errar é apenas gastar o
+# orçamento de rede, o comportamento anterior.
+_SCHEMA_REFUSAL_MARKERS: tuple[str, ...] = (
+    "json_validate_failed",
+    "failed to generate json",
+)
 
 # Throttle: o plano gratuito do Groq limita 30 RPM → 1 requisição a cada 2 s
 # mais margem de segurança (≤ 28 RPM).
@@ -105,32 +123,19 @@ class PRNatureAndClarityOutput(BaseModel):
 
 
 # ---------------------------------------------------------------------------
-# Erros
+# Respostas degradadas — usadas quando o orçamento de schema se esgota
 # ---------------------------------------------------------------------------
 
-
-class SchemaRefusalError(ValueError):
-    """O modelo devolveu conteúdo que não satisfaz o `output_schema`.
-
-    Distinta da falha de rede: tem orçamento de tentativas próprio e não é
-    convertida em sentinela `unknown` — silenciar a recusa contaminaria as
-    correlações sem deixar rastro (ADR-0004). Subclasse de `ValueError` para
-    que chamadores que já capturam `ValueError` sigam funcionando.
-
-    Attributes:
-        repo: Repositório cujo lote provocou a recusa.
-        content: Conteúdo bruto recusado, já truncado para exibição.
-    """
-
-    def __init__(self, repo: str, content: object, attempts: int) -> None:
-        self.repo = repo
-        self.content = str(content)[:_REFUSED_CONTENT_PREVIEW]
-        self.attempts = attempts
-        super().__init__(
-            f"O LLM devolveu conteúdo fora do schema para o repositório "
-            f"'{repo}' em {attempts} tentativa(s). Conteúdo recusado: "
-            f"{self.content!r}"
-        )
+# Esgotado o orçamento de schema, a classificação degrada para o sentinela em
+# vez de propagar: abortar a Análise inteira por causa de um registro descarta
+# tudo o que já foi pago em cota do Groq (ADR-0004). A recusa fica registrada
+# em log, com repositório e conteúdo.
+_DEGRADED_PROJECT_TYPE_JSON: str = json.dumps({"project_type": UNKNOWN_PROJECT_TYPE})
+_DEGRADED_PR_NATURE_JSON: str = json.dumps({"pr_nature": UNKNOWN_PR_NATURE})
+_DEGRADED_CLARITY_JSON: str = json.dumps({"clarity_level": UNKNOWN_CLARITY_LEVEL})
+_DEGRADED_NATURE_AND_CLARITY_JSON: str = json.dumps(
+    {"pr_nature": UNKNOWN_PR_NATURE, "clarity_level": UNKNOWN_CLARITY_LEVEL}
+)
 
 
 # ---------------------------------------------------------------------------
@@ -153,6 +158,65 @@ def _parse_retry_after(error_message: str, default: float = 5.0) -> float:
     """
     match = re.search(r"try again in (\d+(?:\.\d+)?)s", str(error_message))
     return float(match.group(1)) + 1.0 if match else default
+
+
+def _is_schema_refusal_exception(exc: BaseException) -> bool:
+    """Informa se a exceção de `agent.run()` é, na verdade, desvio de schema.
+
+    O Groq rejeita a própria geração quando o JSON mode não converge e devolve
+    HTTP 400 `json_validate_failed`; isso sobe como exceção, não como conteúdo
+    cru. Sem essa classificação, uma recusa determinística consumiria as 6
+    tentativas de rede com backoff exponencial.
+
+    A inspeção é textual porque o tipo da exceção não está disponível: importar
+    `groq.BadRequestError` violaria a regra de não importar o SDK do Groq, e a
+    exceção do Agno é interna. Falso negativo apenas devolve o caminho ao
+    orçamento de rede — o comportamento anterior.
+
+    Args:
+        exc: Exceção levantada pela invocação do agente.
+
+    Returns:
+        True se a mensagem carregar um marcador de recusa de schema.
+    """
+    text = " ".join(
+        str(part)
+        for part in (exc, getattr(exc, "body", ""), getattr(exc, "message", ""))
+    ).lower()
+    return any(marker in text for marker in _SCHEMA_REFUSAL_MARKERS)
+
+
+def _schema_budget_exhausted(
+    repo: str,
+    content: object,
+    attempts: int,
+    max_attempts: int,
+) -> bool:
+    """Registra um desvio de schema e informa se o orçamento acabou.
+
+    Args:
+        repo: Repositório cujo lote provocou a recusa.
+        content: Conteúdo (ou exceção) recusado, para atribuição no log.
+        attempts: Tentativas de schema já consumidas.
+        max_attempts: Orçamento total de tentativas de schema.
+
+    Returns:
+        True quando o orçamento se esgotou e o chamador deve degradar para o
+        sentinela `unknown`; False quando ainda há retentativa disponível.
+    """
+    preview = str(content)[:_REFUSED_CONTENT_PREVIEW]
+    if attempts >= max_attempts:
+        logger.error(
+            f"O LLM devolveu conteúdo fora do schema para o repositório "
+            f"'{repo}' em {attempts} tentativa(s). A classificação degradou "
+            f"para o sentinela 'unknown'. Conteúdo recusado: {preview!r}"
+        )
+        return True
+    logger.warning(
+        f"Resposta fora do output_schema para '{repo}' na tentativa "
+        f"{attempts}. Repetindo uma vez. Conteúdo recusado: {preview!r}"
+    )
+    return False
 
 
 def _build_agent(
@@ -299,7 +363,7 @@ def _invoke_with_retry(
     max_retries: int = _MAX_RETRIES,
     backoff: float = _BACKOFF_FACTOR,
     schema_max_attempts: int = _SCHEMA_MAX_ATTEMPTS,
-) -> BaseModel:
+) -> BaseModel | None:
     """
     Invoca o agente Agno com throttle e dois orçamentos de tentativa distintos.
 
@@ -310,7 +374,9 @@ def _invoke_with_retry(
     Falha de rede e desvio de schema não compartilham política. A rede é
     transitória e merece backoff longo; a recusa de schema é largamente
     determinística e insistir nela só queima cota. Por isso cada uma tem o seu
-    orçamento, contado em separado.
+    orçamento, contado em separado. O desvio de schema chega por dois caminhos
+    — conteúdo cru devolvido pelo Agno, ou HTTP 400 `json_validate_failed`
+    levantado pelo Groq — e ambos usam o orçamento de schema.
 
     Laço justificado: retry de I/O de rede é inerentemente imperativo
     e pertence exclusivamente à camada services/.
@@ -324,11 +390,11 @@ def _invoke_with_retry(
         schema_max_attempts: Número máximo de tentativas para desvio de schema.
 
     Returns:
-        Instância do schema Pydantic validada pelo Agno.
+        Instância do schema Pydantic validada pelo Agno, ou None quando o
+        orçamento de schema se esgotou — sinal para o chamador degradar para o
+        sentinela `unknown` em vez de abortar a Análise inteira (ADR-0004).
 
     Raises:
-        SchemaRefusalError: Se o conteúdo devolvido não satisfizer o
-            `output_schema` após esgotado o orçamento de schema.
         ValueError: Se as tentativas de rede se esgotarem.
     """
     network_attempts = 0
@@ -341,6 +407,13 @@ def _invoke_with_retry(
         try:
             response = agent.run(prompt)
         except Exception as exc:
+            if _is_schema_refusal_exception(exc):
+                schema_attempts += 1
+                if _schema_budget_exhausted(
+                    repo, exc, schema_attempts, schema_max_attempts
+                ):
+                    return None
+                continue
             network_attempts += 1
             if network_attempts >= max_retries:
                 raise ValueError(
@@ -367,14 +440,10 @@ def _invoke_with_retry(
         # Desvio de schema (ou resposta vazia): o Agno engole o ValidationError
         # e devolve o conteúdo cru, então o guarda é a ausência do serializador.
         schema_attempts += 1
-        if schema_attempts >= schema_max_attempts:
-            raise SchemaRefusalError(
-                repo=repo, content=content, attempts=schema_attempts
-            )
-        logger.warning(
-            f"Resposta fora do output_schema para '{repo}' na tentativa "
-            f"{schema_attempts}. Repetindo uma vez."
-        )
+        if _schema_budget_exhausted(
+            repo, content, schema_attempts, schema_max_attempts
+        ):
+            return None
 
 
 # ---------------------------------------------------------------------------
@@ -397,6 +466,8 @@ def classify_project_type_batch(records: tuple[PRRecord, ...]) -> str:
     Returns:
         String bruta retornada pelo LLM, ex: '{"project_type": "library"}'.
         Não normalizada — normalização é responsabilidade do chamador.
+        Esgotado o orçamento de schema, devolve o sentinela
+        '{"project_type": "unknown"}' em vez de propagar a recusa.
 
     Raises:
         ValueError: Se a API key não estiver definida ou todas as
@@ -415,9 +486,12 @@ def classify_project_type_batch(records: tuple[PRRecord, ...]) -> str:
     agent = _build_agent(api_key, model, ProjectTypeOutput)
     prompt = _build_prompt(records, max_chars)
 
-    return _invoke_with_retry(
-        agent=agent, prompt=prompt, repo=records[0].repo
-    ).model_dump_json()
+    response = _invoke_with_retry(agent=agent, prompt=prompt, repo=records[0].repo)
+    return (
+        response.model_dump_json()
+        if response is not None
+        else _DEGRADED_PROJECT_TYPE_JSON
+    )
 
 
 def classify_pr_nature_single(record: PRRecord) -> str:
@@ -456,9 +530,10 @@ def classify_pr_nature_single(record: PRRecord) -> str:
     logger.debug(f"Usando modelo LLM: {model} para classify_pr_nature_single")
 
     agent = _build_agent(api_key, model, PRNatureOutput)
-    return _invoke_with_retry(
-        agent=agent, prompt=prompt, repo=record.repo
-    ).model_dump_json()
+    response = _invoke_with_retry(agent=agent, prompt=prompt, repo=record.repo)
+    return (
+        response.model_dump_json() if response is not None else _DEGRADED_PR_NATURE_JSON
+    )
 
 
 def classify_clarity_single(record: PRRecord) -> str:
@@ -495,9 +570,10 @@ def classify_clarity_single(record: PRRecord) -> str:
     logger.debug(f"Usando modelo LLM: {model} para classify_clarity_single")
 
     agent = _build_agent(api_key, model, ClarityOutput)
-    return _invoke_with_retry(
-        agent=agent, prompt=prompt, repo=record.repo
-    ).model_dump_json()
+    response = _invoke_with_retry(agent=agent, prompt=prompt, repo=record.repo)
+    return (
+        response.model_dump_json() if response is not None else _DEGRADED_CLARITY_JSON
+    )
 
 
 def classify_pr_nature_and_clarity_single(record: PRRecord) -> str:
@@ -537,6 +613,9 @@ def classify_pr_nature_and_clarity_single(record: PRRecord) -> str:
     )
 
     agent = _build_agent(api_key, model, PRNatureAndClarityOutput)
-    return _invoke_with_retry(
-        agent=agent, prompt=prompt, repo=record.repo
-    ).model_dump_json()
+    response = _invoke_with_retry(agent=agent, prompt=prompt, repo=record.repo)
+    return (
+        response.model_dump_json()
+        if response is not None
+        else _DEGRADED_NATURE_AND_CLARITY_JSON
+    )
