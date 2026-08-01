@@ -22,7 +22,7 @@ Não deve:
 
 Relacionado a:
     - Issue 01 (processamento sob demanda do dataset)
-    - ADR 0003 (filtragem é recorte de visualização, não etapa do upload)
+    - ADR 0003 (o Filtro de Visualização não é Etapa do Pipeline)
     - Regra Geral 05 (pipeline configurável com funções de ordem superior)
     - Regra Funcional 04 (avaliação preguiçosa via geradores)
     - Conceito-Chave 01 (lazy evaluation)
@@ -84,8 +84,8 @@ class PipelineConfig(NamedTuple):
     Attributes:
         enable_cleaning: Habilita a limpeza textual dos registros.
         enable_normalization: Habilita a normalização de campos canônicos.
-        filter_predicates: Predicados de filtragem recebidos **por argumento**.
-            A etapa de filtragem roda apenas quando esta tupla não é vazia;
+        filter_predicates: Predicados do Filtro de Visualização recebidos
+            **por argumento**. O recorte roda apenas quando esta tupla não é vazia;
             o padrão vazio garante que a Análise persistida cubra o dataset
             inteiro (ADR 0003 e Regra Geral 04).
         enable_classification: Habilita o enriquecimento semântico via LLM.
@@ -118,11 +118,12 @@ def run_pipeline(
        - Batching por repositório
        - Cache dois níveis (memória + disco)
        - Retorna AnalysisResult enriquecido
-    3. **Filtragem** (core/transforms/filtering.py)
-       - Só roda se `config.filter_predicates` não for vazia
-       - Predicados chegam por argumento, nunca de estado global
-       - Não é usada no caminho do upload: o recorte da sidebar é Filtro de
-         Visualização, aplicado sobre a Análise já carregada (ADR 0003)
+    Recorte opcional, que **não** é Etapa (ADR 0003):
+    - **Filtro de Visualização** (core/transforms/filtering.py)
+      - Só roda se `config.filter_predicates` não for vazia
+      - Predicados chegam por argumento, nunca de estado global
+      - Não é usado no caminho do upload: o recorte da sidebar é aplicado sobre
+        a Análise já carregada
 
     Implementação pura via composição funcional:
     - Lazy evaluation com generators
@@ -201,15 +202,16 @@ def run_pipeline(
 
         stream = (_stub_analysis_result(record) for record in stream)
 
-    # Etapa 4: Filtragem — só quando o chamador passa predicados por argumento.
-    # Roda depois da classificação porque Predicate avalia AnalysisResult.
+    # Filtro de Visualização — não é Etapa (ADR 0003); só roda quando o chamador
+    # passa predicados por argumento, e depois da classificação porque Predicate
+    # avalia AnalysisResult.
     if config.filter_predicates:
         stream = apply_filters(
             config.filter_predicates,
             stream,
         )
 
-    # Etapa 5: Agregação (opcional, apenas para views específicas)
+    # Etapa 4: Agregação (opcional, apenas para views específicas)
     # Se habilitada, seria aplicada aqui via core/aggregations/*
     if config.enable_aggregation:
         # Placeholder: agregação é opcional, feita no nivel de UI
