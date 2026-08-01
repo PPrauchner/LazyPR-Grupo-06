@@ -22,8 +22,7 @@ from typing import Any, Callable, Generator, TypeVar
 
 from services.storage import (
     REPO_CLASSIFICATION_NAMESPACE,
-    has_cached_analysis,
-    load_results,
+    read_results,
     save_results,
 )
 
@@ -36,9 +35,9 @@ def cached_classify(
     """Memoização via cache em disco para classificações LLM (sem estado global).
 
     Fluxo de lookup:
-    1. Verifica cache em disco via storage.py
-    2. Se existe: carrega e retorna
-    3. Se não existe: chama classify_fn, persiste, retorna
+    1. Lê o cache em disco via storage.py
+    2. Se legível por inteiro: retorna o que estava persistido
+    3. Se ausente ou corrompido: chama classify_fn, persiste, retorna
 
     Args:
         classify_fn: Função de classificação que retorna gerador.
@@ -47,13 +46,12 @@ def cached_classify(
     Yields:
         Resultado de classificação (cached ou fresh).
     """
-    # Verificar se já está em cache em disco. O namespace mantém estas
-    # classificações fora do espaço da Análise do dataset: versionar uma não
-    # invalida a outra (issue #101).
-    if has_cached_analysis(content_hash, namespace=REPO_CLASSIFICATION_NAMESPACE):
-        cached_results = list(
-            load_results(content_hash, namespace=REPO_CLASSIFICATION_NAMESPACE)
-        )
+    # Uma leitura só decide o hit: perguntar "existe?" e depois "é legível?" em
+    # chamadas separadas deixava um cache corrompido virar hit vazio. O namespace
+    # mantém estas classificações fora do espaço da Análise do dataset:
+    # versionar uma não invalida a outra (issue #101).
+    cached_results = read_results(content_hash, namespace=REPO_CLASSIFICATION_NAMESPACE)
+    if cached_results is not None:
         yield from cached_results
         return
 

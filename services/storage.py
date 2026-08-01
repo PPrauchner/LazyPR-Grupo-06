@@ -82,12 +82,19 @@ def _schema_version(namespace: str) -> str:
 
     Returns:
         Versão de esquema aplicada ao nome dos arquivos daquele espaço.
+
+    Raises:
+        KeyError: Se o espaço de nomes não for conhecido. Falhar alto evita que
+            um namespace novo ou digitado errado herde em silêncio a versão de
+            outro e passe a ler o cache errado.
     """
-    return (
-        CACHE_SCHEMA_VERSION
-        if namespace == ANALYSIS_NAMESPACE
-        else REPO_CLASSIFICATION_SCHEMA_VERSION
-    )
+    # Montado a cada chamada de propósito: as versões são lidas dos globais do
+    # módulo no momento do uso, e não congeladas na importação.
+    versions = {
+        ANALYSIS_NAMESPACE: CACHE_SCHEMA_VERSION,
+        REPO_CLASSIFICATION_NAMESPACE: REPO_CLASSIFICATION_SCHEMA_VERSION,
+    }
+    return versions[namespace]
 
 
 def _cache_path(
@@ -109,18 +116,59 @@ def _cache_path(
     return _get_cache_dir() / namespace / f"{version}-{repo_hash}.{suffix}"
 
 
+def read_results(
+    repo_hash: str, namespace: str = ANALYSIS_NAMESPACE
+) -> tuple[AnalysisResult, ...] | None:
+    """Lê o cache de um hash por inteiro, distinguindo vazio de ilegível.
+
+    O arquivo é lido e reconstituído **integralmente** antes de qualquer valor
+    ser devolvido: ou o cache inteiro é válido, ou ele é um miss. Isso impede
+    que um item malformado no meio da lista entregue ao chamador um prefixo
+    parcial disfarçado de conjunto completo — que depois seria persistido como
+    se fosse a Análise inteira.
+
+    Args:
+        repo_hash: Hash SHA-256 único do dataset ou do batch de repositório.
+        namespace: Espaço de nomes do cache a consultar.
+
+    Returns:
+        Tupla com os resultados persistidos (possivelmente vazia, se o cache
+        gravado era mesmo vazio), ou None se o cache está ausente, ilegível ou
+        malformado — caso em que o chamador deve recomputar.
+    """
+    cache_path = _cache_path(repo_hash, namespace=namespace)
+
+    if not (cache_path.exists() and cache_path.is_file()):
+        return None
+
+    try:
+        with open(cache_path, "r", encoding="utf-8") as f:
+            data = json.load(f)
+
+        if not isinstance(data, list):
+            return None
+
+        return tuple(AnalysisResult(**item) for item in data)
+    except (OSError, json.JSONDecodeError, KeyError, TypeError, ValueError):
+        return None
+
+
 def has_cached_analysis(repo_hash: str, namespace: str = ANALYSIS_NAMESPACE) -> bool:
-    """Verifica se análise já foi persistida para um repositório.
+    """Verifica se há análise persistida **e legível** para um hash.
+
+    Existir arquivo e ser legível são perguntas diferentes: um cache corrompido
+    que passasse por hit viraria um conjunto truncado de registros. Por isso o
+    predicado valida o conteúdo, não apenas a existência.
 
     Args:
         repo_hash: Hash SHA-256 único do repositório.
         namespace: Espaço de nomes do cache a consultar.
 
     Returns:
-        True se arquivo de cache existe e é válido, False caso contrário.
+        True se o arquivo de cache existe e pôde ser lido por inteiro, False
+        caso contrário.
     """
-    cache_path = _cache_path(repo_hash, namespace=namespace)
-    return cache_path.exists() and cache_path.is_file()
+    return read_results(repo_hash, namespace=namespace) is not None
 
 
 def load_results(
@@ -129,7 +177,8 @@ def load_results(
     """Carrega análises persistidas de um repositório do cache.
 
     Lê arquivo JSON e reconstitui AnalysisResult.
-    Em caso de arquivo inválido ou inexistente, retorna gerador vazio.
+    Em caso de arquivo inválido ou inexistente, retorna gerador vazio — sem
+    nunca emitir um prefixo parcial de um cache corrompido (ver read_results).
 
     Args:
         repo_hash: Hash SHA-256 único do repositório.
@@ -138,22 +187,7 @@ def load_results(
     Yields:
         AnalysisResult reconstituído do arquivo JSON.
     """
-    cache_path = _cache_path(repo_hash, namespace=namespace)
-
-    if not cache_path.exists():
-        return
-
-    try:
-        with open(cache_path, "r", encoding="utf-8") as f:
-            data = json.load(f)
-
-        if isinstance(data, list):
-            # Laço justificado: yield com **unpacking exige generator function explícita;
-            # yield from map(lambda d: AnalysisResult(**d), data) seria equivalente mas menos legível.
-            for item in data:
-                yield AnalysisResult(**item)
-    except (json.JSONDecodeError, KeyError, TypeError):
-        return
+    yield from read_results(repo_hash, namespace=namespace) or ()
 
 
 def save_results(
