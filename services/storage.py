@@ -36,6 +36,7 @@ from pathlib import Path
 from typing import Generator
 
 from core.models.analysis_result import AnalysisResult
+from services.prompt_version import PROMPT_VERSION
 
 # Espaços de nomes do cache. Cada um vira um subdiretório de CACHE_DIR e tem a
 # própria versão de esquema, para que um bump atinja só o cache afetado.
@@ -109,11 +110,19 @@ def _cache_path(
         namespace: Espaço de nomes do cache (subdiretório de CACHE_DIR).
 
     Returns:
-        Caminho do arquivo, sob o subdiretório do namespace e prefixado pela
-        versão de esquema daquele namespace.
+        Caminho do arquivo, sob o subdiretório do namespace e prefixado por duas
+        versões independentes: a de esquema daquele namespace (formato de
+        armazenamento) e a de prompt (rubrica enviada ao LLM).
     """
     version = _schema_version(namespace)
-    return _get_cache_dir() / namespace / f"{version}-{repo_hash}.{suffix}"
+    # PROMPT_VERSION é lida do global do módulo a cada chamada, e não congelada
+    # na importação: é o que permite a um teste trocá-la e observar o cache
+    # inteiro dar miss, como acontece quando a rubrica muda de verdade.
+    return (
+        _get_cache_dir()
+        / namespace
+        / f"{version}-{PROMPT_VERSION}-{repo_hash}.{suffix}"
+    )
 
 
 def read_results(
