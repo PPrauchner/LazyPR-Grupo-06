@@ -149,7 +149,8 @@ core/                          # Functional Core — apenas funções puras
 services/                      # Imperative Shell
 ├── ingestion.py               # stream_csv(), stream_json(), ingest_dataset(), read_header_lazily()
 ├── llm_client.py              # classify_project_type_batch(), classify_pr_nature_and_clarity_single()
-├── classifiers.py             # classify_project_type(), classify_pr_nature(), classify_clarity()
+├── classifiers.py             # classify_project_type()
+├── prompt_version.py          # PROMPT_VERSION — dimensão de rubrica na chave de cache
 ├── storage.py                 # has_cached_analysis(), load_results(), save_results()
 └── exporters.py               # export_csv(), export_json(), to_download_bytes(), enrich_records()
 
@@ -274,6 +275,14 @@ Regras invioláveis:
   repositório, `REPO_CLASSIFICATION_SCHEMA_VERSION`). Versionar um **não**
   invalida o outro — ver
   [ADR-0003](./docs/adr/0003-filtragem-como-recorte-de-visualizacao.md).
+- O nome do arquivo carrega **duas versões independentes**:
+  `<versão-de-esquema>-<versão-de-prompt>-<hash>.json`. A `PROMPT_VERSION` vive
+  em `services/prompt_version.py` (módulo sem imports, para não arrastar o Agno
+  para dentro do storage) e, ao contrário da versão de esquema, compõe a chave
+  dos **dois** namespaces — a rubrica produz o `clarity_level`, que mora nos
+  dois. Mudou prompt, bumpe a versão de prompt; mudou formato de armazenamento,
+  bumpe a de esquema. Uma não mexe no que a outra invalida
+  ([ADR-0002](./docs/adr/0002-clareza-avaliada-sobre-o-comentario-de-revisao.md)).
 
 ### Rate limit do Groq
 
@@ -368,12 +377,14 @@ são dívida a aceitar.
    - `tests/transforms/test_filtering.py` — importa `has_project_type`, que não
      existe em `core/transforms/filtering.py`
 
-3. **Prompts descrevem o dado errado.** `services/llm_client.py:367-369` e `:407`
-   instruem o modelo a avaliar *"GitHub Pull Request descriptions"*, mas enviam
-   `record.body` — o corpo de um Comentário de Revisão (ver
-   [`CONTEXT.md`](./CONTEXT.md)). Comentários de revisão competentes são julgados
-   como descrições de PR incompletas, o que enviesa `clarity_level` para baixo e
-   contamina a correlação da HU 07.
+3. ~~**Prompts descrevem o dado errado.**~~ — resolvida (issue #85). O prompt
+   unificado descreve um Comentário de Revisão, rotula o campo como
+   `Review comment:`, envia o `diff_hunk` truncado como contexto e usa uma
+   rubrica de acionabilidade em que concisão não é defeito. A chave de cache
+   ganhou a dimensão `PROMPT_VERSION`, que invalida as classificações da rubrica
+   antiga nos dois namespaces sem apagar nada à mão
+   ([ADR-0002](./docs/adr/0002-clareza-avaliada-sobre-o-comentario-de-revisao.md)).
+   A interface e os relatórios seguem dizendo "PR".
 
 4. **`main.py` com indentação inconsistente** (linhas 75-82): o bloco do `if` usa
    1 espaço, o do `else` usa 3, e há trailing whitespace — Regra Geral 09 (Clean

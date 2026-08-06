@@ -27,13 +27,32 @@ conforme a ponte já registrada no `CONTEXT.md`.
 
 O `diff_hunk` passa a integrar o prompt de clareza. Sem ele o modelo julga um
 texto arrancado do contexto — "isso aqui devia ser const" só é avaliável ao lado
-da linha comentada. O hunk é truncado para segurar o custo de token a 30 RPM.
+da linha comentada. O hunk é truncado em 500 caracteres
+(`_MAX_DIFF_HUNK_CHARS`) para segurar o custo de token a 30 RPM. A rubrica entra
+no prompt unificado de natureza + clareza, então uma chamada só continua servindo
+às duas classificações.
 
 **As classificações já persistidas foram produzidas pela rubrica antiga.** Para
-que corrigir o prompt não conviva silenciosamente com resultados velhos, a chave
-de cache passa a incluir uma **versão de prompt**: `hash(dataset + versão)`. Isso
-invalida sozinho o cache agora e em toda edição futura de prompt, sem depender de
-alguém lembrar de apagar `.cache/`. O cache antigo permanece no disco, inerte.
+que corrigir o prompt não conviva silenciosamente com resultados velhos, o nome
+do arquivo de cache passa a carregar uma **versão de prompt** (`PROMPT_VERSION`,
+em `services/prompt_version.py`) ao lado da versão de esquema já existente:
+
+```
+.cache/analysis/v2-p1-<hash>.json
+.cache/repo-classification/v1-p1-<hash>.json
+```
+
+São **duas dimensões independentes** — versão de esquema (formato de
+armazenamento) × versão de prompt (rubrica) — e a de prompt compõe a chave dos
+**dois** espaços de nomes, porque o `clarity_level` que ela produz mora nos dois.
+Bumpar uma não mexe no que a outra invalida. Isso invalida sozinho o cache agora
+e em toda edição futura de prompt, sem depender de alguém lembrar de apagar
+`.cache/`. O cache antigo permanece no disco, inerte.
+
+Dois prompts mortos foram removidos junto: `classify_pr_nature_single` e
+`classify_clarity_single`, alcançáveis apenas por wrappers sem nenhum chamador —
+e que nem sequer importavam as funções que invocavam. Manter uma segunda rubrica
+de clareza que ninguém executa é convidar a divergência.
 
 Os números da HU 04 e da HU 07 mudam de significado entre o antes e o depois desta
 decisão. Comparações com resultados gerados antes dela não são válidas.
