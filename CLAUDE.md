@@ -133,7 +133,8 @@ core/                          # Functional Core — apenas funções puras
 │   └── analysis_result.py     # AnalysisResult (NamedTuple) — PR enriquecido
 ├── pipeline/
 │   ├── composer.py            # compose(), pipe(), identity()
-│   └── runner.py              # run_pipeline(), build_pipeline(), PipelineConfig, PipelineMetrics
+│   ├── runner.py              # run_pipeline(steps, source) — única função centralizadora
+│   └── stages.py              # catálogo de Etapas: clean_records(), normalize_records(), enrich_without_classification(), filter_results()
 ├── transforms/
 │   ├── cleaning.py            # clean_pr_record(), clean_body(), truncate_text(), ...
 │   ├── filtering.py           # by_language(), by_clarity_level(), compose_predicates(), apply_filters()
@@ -239,15 +240,20 @@ como `UNKNOWN_PROJECT_TYPE`, `UNKNOWN_PR_NATURE`, `UNKNOWN_CLARITY_LEVEL`.
 
 ## 9. Pipeline
 
-`run_pipeline(source, config)` executa etapas habilitadas por `PipelineConfig`,
-de forma lazy, retornando `Generator[AnalysisResult]`:
+`run_pipeline(steps, source)` compõe de forma lazy as Etapas recebidas **por
+argumento**, retornando um gerador. As Etapas vêm do catálogo em
+`core/pipeline/stages.py` (mais `classify_project_type`, que é impura e mora em
+`services/`); quem monta a tupla é o usuário, pelos checkboxes de
+`views/upload.py`. Etapa desmarcada não entra na tupla — não há flag no runner:
 
 ```
 stream_csv() → PRRecord
-   ↓ enable_cleaning        clean_pr_record()      body/diff truncados, HTML removido
-   ↓ enable_normalization   normalize_pr_record()  language canônica
-   ↓ enable_filtering       apply_filters()        predicados compostos
-   ↓ enable_classification  classify_*()           → AnalysisResult
+   ↓ clean_records                 body/diff truncados, HTML removido
+   ↓ normalize_records             language canônica
+   ↓ classify_project_type         → AnalysisResult   (ou, sem LLM,
+     enrich_without_classification   → AnalysisResult com `unknown`)
+   ↓ filter_results(predicates)    recorte opcional, só quando o chamador
+                                   passa a Etapa (ADR-0003)
 ```
 
 ---
@@ -349,15 +355,11 @@ são dívida a aceitar.
 
 ### Não-conformidades com o enunciado
 
-1. **Regra Geral 05 — pipeline sem funções de ordem superior.** A regra exige
-   etapas *passadas como argumento* a uma função centralizadora **e** ativáveis
-   pelo chamador. `run_pipeline(source, config)` tem só a segunda metade: recebe
-   flags e mantém as etapas fixas no corpo, encadeadas por `if`.
-   `build_pipeline(*stages)` cumpre a primeira metade mas **nunca é chamado em
-   produção** — só em testes. A própria docstring do módulo
-   (`core/pipeline/runner.py:8`) declara a assinatura pretendida como
-   `run_pipeline(steps, source)`. O caminho real de execução é
-   `views/upload.py:163`.
+1. ~~**Regra Geral 05 — pipeline sem funções de ordem superior**~~ — resolvida
+   (issue #84): `run_pipeline(steps, source)` recebe as Etapas por argumento e
+   as compõe, e `views/upload.py` oferece cada Etapa ao usuário como checkbox —
+   a desmarcada não entra na tupla. `PipelineConfig`, `PipelineMetrics`,
+   `build_pipeline` e `enable_aggregation` foram removidos.
 
 ### Defeitos
 
