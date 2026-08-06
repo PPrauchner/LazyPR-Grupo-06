@@ -103,18 +103,6 @@ class ProjectTypeOutput(BaseModel):
     project_type: ProjectTypeValue
 
 
-class PRNatureOutput(BaseModel):
-    """Saída estruturada da classificação de natureza da contribuição."""
-
-    pr_nature: PRNatureValue
-
-
-class ClarityOutput(BaseModel):
-    """Saída estruturada da avaliação de clareza da descrição."""
-
-    clarity_level: ClarityLevelValue
-
-
 class PRNatureAndClarityOutput(BaseModel):
     """Saída estruturada da chamada unificada natureza + clareza."""
 
@@ -131,8 +119,6 @@ class PRNatureAndClarityOutput(BaseModel):
 # tudo o que já foi pago em cota do Groq (ADR-0004). A recusa fica registrada
 # em log, com repositório e conteúdo.
 _DEGRADED_PROJECT_TYPE_JSON: str = json.dumps({"project_type": UNKNOWN_PROJECT_TYPE})
-_DEGRADED_PR_NATURE_JSON: str = json.dumps({"pr_nature": UNKNOWN_PR_NATURE})
-_DEGRADED_CLARITY_JSON: str = json.dumps({"clarity_level": UNKNOWN_CLARITY_LEVEL})
 _DEGRADED_NATURE_AND_CLARITY_JSON: str = json.dumps(
     {"pr_nature": UNKNOWN_PR_NATURE, "clarity_level": UNKNOWN_CLARITY_LEVEL}
 )
@@ -491,88 +477,6 @@ def classify_project_type_batch(records: tuple[PRRecord, ...]) -> str:
         response.model_dump_json()
         if response is not None
         else _DEGRADED_PROJECT_TYPE_JSON
-    )
-
-
-def classify_pr_nature_single(record: PRRecord) -> str:
-    """
-    Classifica a natureza de um PR individual baseada no corpo da descrição.
-
-    Envia um único PR ao LLM com prompt específico para inferir sua natureza:
-    bug_fix, feature, refactoring, documentation ou other.
-
-    Memoizado: mesma entrada (record) → mesma saída (cached).
-
-    Args:
-        record: PRRecord a classificar.
-
-    Returns:
-        String JSON bruta retornada pelo LLM,
-        ex: '{"pr_nature": "feature"}'.
-
-    Raises:
-        ValueError: Se a API key não estiver definida ou LLM falhar.
-    """
-    if not record.body or not record.body.strip():
-        return '{"pr_nature": "other"}'
-
-    prompt = (
-        "You are an AI assistant classifying the nature of a GitHub Pull Request.\n"
-        "Analyze the PR description and determine its nature.\n"
-        "Valid values for 'pr_nature': 'bug_fix', 'feature', 'refactoring', 'documentation', 'other'.\n"
-        f"\nRepository: {record.repo}\n"
-        f"Path: {record.path[:100]}\n"
-        f"PR Description: {record.body[:1000]}\n"
-    )
-
-    api_key = os.getenv("GROQ_API_KEY")
-    model = _DEFAULT_MODEL
-    logger.debug(f"Usando modelo LLM: {model} para classify_pr_nature_single")
-
-    agent = _build_agent(api_key, model, PRNatureOutput)
-    response = _invoke_with_retry(agent=agent, prompt=prompt, repo=record.repo)
-    return (
-        response.model_dump_json() if response is not None else _DEGRADED_PR_NATURE_JSON
-    )
-
-
-def classify_clarity_single(record: PRRecord) -> str:
-    """
-    Classifica o nível de clareza da descrição de um PR individual.
-
-    Envia um único PR ao LLM com prompt específico para avaliar se a
-    descrição é insufficient, basic, good ou excellent.
-
-    Args:
-        record: PRRecord a classificar.
-
-    Returns:
-        String JSON bruta retornada pelo LLM,
-        ex: '{"clarity_level": "good"}'.
-
-    Raises:
-        ValueError: Se a API key não estiver definida ou LLM falhar.
-    """
-    if not record.body or not record.body.strip():
-        return '{"clarity_level": "insufficient"}'
-
-    prompt = (
-        "You are an AI assistant evaluating the clarity of GitHub Pull Request descriptions.\n"
-        "Assess the PR description and determine its clarity level.\n"
-        "Valid values for 'clarity_level': 'insufficient', 'basic', 'good', 'excellent'.\n"
-        "Consider: presence of context, problem statement, solution explanation, and examples.\n"
-        f"\nRepository: {record.repo}\n"
-        f"PR Description: {record.body[:1000]}\n"
-    )
-
-    api_key = os.getenv("GROQ_API_KEY")
-    model = _DEFAULT_MODEL
-    logger.debug(f"Usando modelo LLM: {model} para classify_clarity_single")
-
-    agent = _build_agent(api_key, model, ClarityOutput)
-    response = _invoke_with_retry(agent=agent, prompt=prompt, repo=record.repo)
-    return (
-        response.model_dump_json() if response is not None else _DEGRADED_CLARITY_JSON
     )
 
 

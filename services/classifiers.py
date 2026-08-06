@@ -8,12 +8,9 @@ Responsabilidades:
     - Implementar `classify_project_type(records)` que agrupa PRs do mesmo
       repositório em um único lote antes de chamar `llm_client.py`,
       evitando uma chamada por PR e reduzindo custo conforme a Dica 06.
-    - Implementar `classify_pr_nature(record)` que envia título e corpo
-      limpo de um PR ao LLM para determinar sua natureza
-      (bug_fix, feature, refactoring, documentation).
-    - Implementar `classify_clarity(record)` que instrui o LLM a avaliar
-      a clareza da descrição, retornando um dos níveis do vocabulário
-      controlado (insuficiente, básica, boa, excelente).
+    - Obter natureza da contribuição e clareza numa única chamada ao LLM
+      (`classify_pr_nature_and_clarity_single`), ambas no vocabulário
+      controlado.
     - Verificar o cache (via utils/memoization.py) antes de qualquer
       chamada ao LLM, delegando a chamada real apenas em caso de cache miss.
     - Pós-processar a resposta JSON do LLM via funções puras de
@@ -238,15 +235,3 @@ def classify_project_type(
                 )
             else:
                 yield cached_analysis
-
-
-def classify_pr_nature(record: PRRecord) -> str:
-    """Classifica natureza da contribuição de um PR."""
-    raw_response = classify_pr_nature_single(record)
-    return _extract_field_from_json(raw_response, "pr_nature")
-
-
-def classify_clarity(record: PRRecord) -> str:
-    """Classifica clareza da descrição do PR."""
-    raw_response = classify_clarity_single(record)
-    return _extract_field_from_json(raw_response, "clarity_level")
