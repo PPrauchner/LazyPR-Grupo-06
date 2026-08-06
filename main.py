@@ -94,29 +94,32 @@ if "page_override" in st.session_state:
 else:
     page = filters["page"]
 
-if page == "🏠 Home":
+# O roteamento casa por chave estável, nunca pelo rótulo visível: mudar o texto
+# de um rótulo (ou traduzi-lo) muda o que a navegação escreve na tela, não para
+# onde ela leva. Os rótulos vivem em `ui/sidebar_filters.PAGE_LABELS`.
+if page == "home":
 
     render_home(records)
 
-elif page == "📂 Upload":
+elif page == "upload":
 
     render_upload_page()
 
-elif page == "📊 Overview":
+elif page == "overview":
 
     render_overview(records)
 
-elif page == "🔥 Correlação":
+elif page == "correlations":
 
     render_correlation_dashboard(records)
 
-elif page == "💾 Exportação":
+elif page == "export":
 
     render_export_page(records)
-elif page == "🧹 Limpeza":
+elif page == "cleaning":
 
     render_cleaning_dashboard(records)
 
-elif page == "⚙️ Normalização":
+elif page == "normalization":
 
     render_normalization_dashboard(records)

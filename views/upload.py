@@ -108,7 +108,7 @@ def render_upload_page() -> None:
 
             if st.button("📊 Ver Análise"):
 
-                st.session_state["page_override"] = "📊 Overview"
+                st.session_state["page_override"] = "overview"
                 st.rerun()
 
         with col2:
