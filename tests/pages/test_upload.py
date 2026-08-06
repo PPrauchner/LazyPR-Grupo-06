@@ -1,6 +1,13 @@
 import pytest
 from unittest.mock import MagicMock, patch
-from views.upload import _validate_schema
+
+from core.pipeline.stages import (
+    clean_records,
+    enrich_without_classification,
+    normalize_records,
+)
+from services.classifiers import classify_project_type
+from views.upload import _select_stages, _validate_schema
 
 
 @patch("views.upload.st")
@@ -49,3 +56,37 @@ def test_validate_schema_success(mock_read_header, mock_get_missing, mock_st):
     assert is_valid is True
     # Garante que nenhum erro foi jogado na tela
     mock_st.error.assert_not_called()
+
+
+@patch("views.upload.st")
+def test_select_stages_with_every_checkbox_marked(mock_st):
+    """Com todas as Etapas marcadas, o pipeline recebe as três, em ordem."""
+    mock_st.checkbox.return_value = True
+
+    assert _select_stages() == (
+        clean_records,
+        normalize_records,
+        classify_project_type,
+    )
+
+
+@patch("views.upload.st")
+def test_select_stages_drops_the_unchecked_stage(mock_st):
+    """Desmarcar a Limpeza a tira da tupla — sem alteração de código."""
+    mock_st.checkbox.side_effect = lambda label, **kwargs: label != "Limpeza textual"
+
+    stages = _select_stages()
+
+    assert clean_records not in stages
+    assert stages == (normalize_records, classify_project_type)
+
+
+@patch("views.upload.st")
+def test_select_stages_replaces_classification_by_neutral_enrichment(mock_st):
+    """Sem LLM, o enriquecimento neutro mantém o contrato de AnalysisResult."""
+    mock_st.checkbox.side_effect = lambda label, **kwargs: "LLM" not in label
+
+    stages = _select_stages()
+
+    assert classify_project_type not in stages
+    assert stages[-1] is enrich_without_classification

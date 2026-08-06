@@ -4,25 +4,29 @@ tests/test_runner.py
 Testes para core/pipeline/runner.py - integração completa do pipeline.
 
 Cobertura:
-    - Execução sequencial das etapas (normalização → classificação)
-    - Configuração de etapas ativáveis/desativáveis
+    - Execução sequencial das Etapas recebidas como argumento
+    - Etapas ativáveis: só roda o que está na tupla
     - Lazy evaluation (generators, sem materialização)
-    - Composição funcional via build_pipeline()
+    - Composição funcional via composer
 """
 
 import pytest
 from unittest.mock import patch, MagicMock
 from core.models.pr_record import PRRecord
 from core.models.analysis_result import AnalysisResult
-from core.pipeline.runner import (
-    run_pipeline,
-    PipelineConfig,
-    build_pipeline,
-    PipelineMetrics,
+from core.pipeline.runner import run_pipeline
+from core.pipeline.stages import (
+    enrich_without_classification,
+    filter_results,
+    normalize_records,
 )
 from core.pipeline.composer import pipe, compose, identity
 from core.transforms.filtering import is_language
+from services.classifiers import classify_project_type
 from utils.memoization import clear_cache
+
+# Etapas usadas nos testes offline: normalizam e enriquecem sem tocar no LLM.
+_OFFLINE_STEPS = (normalize_records, enrich_without_classification)
 
 # ---------------------------------------------------------------------------
 # Fixtures
@@ -36,38 +40,6 @@ def sample_pr_list(sample_pr, sample_pr_same_repo, sample_pr_different_repo):
 
 
 # ---------------------------------------------------------------------------
-# Tests: PipelineConfig
-# ---------------------------------------------------------------------------
-
-
-class TestPipelineConfig:
-    """Testes para configuração do pipeline."""
-
-    def test_pipeline_config_defaults(self):
-        """Testa valores padrão de PipelineConfig."""
-        config = PipelineConfig()
-        assert config.enable_normalization is True
-        # Sem predicados por padrão: a Análise cobre o dataset inteiro (#82)
-        assert config.filter_predicates == ()
-        assert config.enable_classification is True
-        assert config.enable_aggregation is False
-
-    def test_pipeline_config_custom(self):
-        """Testa configuração customizada."""
-        predicate = is_language("python")
-        config = PipelineConfig(
-            enable_normalization=True,
-            filter_predicates=(predicate,),
-            enable_classification=True,
-            enable_aggregation=True,
-        )
-        assert config.enable_normalization is True
-        assert config.filter_predicates == (predicate,)
-        assert config.enable_classification is True
-        assert config.enable_aggregation is True
-
-
-# ---------------------------------------------------------------------------
 # Tests: run_pipeline() - Normalização
 # ---------------------------------------------------------------------------
 
@@ -75,25 +47,9 @@ class TestPipelineConfig:
 class TestRunPipelineNormalization:
     """Testes para etapa de normalização."""
 
-    def test_normalize_language_variant(self, sample_pr):
-        """Testa que linguagem é normalizada (Python 3 → python)."""
-        config = PipelineConfig(
-            enable_classification=False,  # Desabilitar classification para testar só normalização
-        )
-        records = [sample_pr]
-        results = list(run_pipeline(records, config))
-
-        # Deve ter normalizado language
-        assert len(results) == 1
-        # Note: A normalização acontece, mas como desabilitamos classification,
-        # recebemos AnalysisResult com language do original
-        # (o campo language em AnalysisResult usa o normalizado do PR)
-
     def test_calculate_metrics_char_count(self, sample_pr):
         """Testa cálculo de char_count."""
-        config = PipelineConfig(enable_classification=False)
-        records = [sample_pr]
-        results = list(run_pipeline(records, config))
+        results = list(run_pipeline(_OFFLINE_STEPS, [sample_pr]))
 
         assert len(results) == 1
         assert results[0].char_count == len(sample_pr.body)
@@ -101,9 +57,7 @@ class TestRunPipelineNormalization:
 
     def test_calculate_metrics_word_count(self, sample_pr):
         """Testa cálculo de word_count."""
-        config = PipelineConfig(enable_classification=False)
-        records = [sample_pr]
-        results = list(run_pipeline(records, config))
+        results = list(run_pipeline(_OFFLINE_STEPS, [sample_pr]))
 
         assert len(results) == 1
         assert results[0].word_count == len(sample_pr.body.split())
@@ -120,12 +74,11 @@ class TestRunPipelineClassification:
 
     @patch("services.classifiers.classify_project_type_batch")
     def test_classify_project_type_full_pipeline(self, mock_llm, sample_pr):
-        """Testa pipeline com classificação habilitada."""
+        """Testa pipeline com a Etapa de classificação na tupla."""
         mock_llm.return_value = '{"project_type": "library"}'
 
-        config = PipelineConfig(enable_classification=True)
-        records = [sample_pr]
-        results = list(run_pipeline(records, config))
+        steps = (normalize_records, classify_project_type)
+        results = list(run_pipeline(steps, [sample_pr]))
 
         # Deve ter pelo menos 1 resultado (pode haver duplicata por grupo)
         assert len(results) >= 1
@@ -133,23 +86,28 @@ class TestRunPipelineClassification:
 
 
 # ---------------------------------------------------------------------------
-# Tests: run_pipeline() - Config Toggles
+# Tests: run_pipeline() - Etapas ativáveis
 # ---------------------------------------------------------------------------
 
 
-class TestRunPipelineConfigToggles:
+class TestRunPipelineSelectableStages:
     """Testes para etapas ativáveis/desativáveis."""
 
-    def test_disabled_classification_returns_stub(self, sample_pr):
-        """Testa que desabilitar classification retorna AnalysisResult com 'other'."""
-        config = PipelineConfig(enable_classification=False)
-        records = [sample_pr]
-        results = list(run_pipeline(records, config))
+    def test_omitted_classification_yields_unknown_labels(self, sample_pr):
+        """Sem a Etapa de classificação, as três classificações são 'unknown'."""
+        results = list(run_pipeline(_OFFLINE_STEPS, [sample_pr]))
 
         assert len(results) == 1
-        assert results[0].project_type == "other"
-        assert results[0].pr_nature == "other"
-        assert results[0].clarity_level == "other"
+        assert results[0].project_type == "unknown"
+        assert results[0].pr_nature == "unknown"
+        assert results[0].clarity_level == "unknown"
+
+    def test_filter_stage_only_runs_when_included(self, sample_pr):
+        """A Etapa de filtragem só recorta o stream quando está na tupla."""
+        never_matches = filter_results((is_language("__nenhuma__"),))
+
+        assert len(list(run_pipeline(_OFFLINE_STEPS, [sample_pr]))) == 1
+        assert list(run_pipeline(_OFFLINE_STEPS + (never_matches,), [sample_pr])) == []
 
 
 # ---------------------------------------------------------------------------
@@ -165,42 +123,11 @@ class TestRunPipelineLazyEvaluation:
         """Testa que run_pipeline retorna generator, não lista."""
         mock_llm.return_value = '{"project_type": "library"}'
 
-        config = PipelineConfig(enable_classification=True)
-        records = [sample_pr]
-        result = run_pipeline(records, config)
+        result = run_pipeline((normalize_records, classify_project_type), [sample_pr])
 
         # Deve ser generator
         assert hasattr(result, "__iter__")
         assert hasattr(result, "__next__")
-
-
-# ---------------------------------------------------------------------------
-# Tests: build_pipeline() - Composição Funcional
-# ---------------------------------------------------------------------------
-
-
-class TestBuildPipeline:
-    """Testes para construção de pipelines customizados via composição."""
-
-    def test_build_pipeline_simple_composition(self):
-        """Testa composição simples de funções."""
-        add_one = lambda x: x + 1
-        double = lambda x: x * 2
-
-        # pipe: double(5) = 10, add_one(10) = 11
-        pipeline = build_pipeline(double, add_one)
-        result = pipeline(5)
-
-        assert result == 11
-
-    def test_build_pipeline_with_identity(self):
-        """Testa pipeline que inclui função identidade."""
-        add_one = lambda x: x + 1
-
-        pipeline = build_pipeline(identity, add_one)
-        result = pipeline(5)
-
-        assert result == 6
 
 
 # ---------------------------------------------------------------------------
@@ -263,10 +190,8 @@ class TestRunPipelineIntegration:
 
     def test_deterministic_results(self, sample_pr):
         """Testa que execuções repetidas produzem mesmos resultados."""
-        config = PipelineConfig(enable_classification=False)
-
-        results1 = list(run_pipeline([sample_pr], config))
-        results2 = list(run_pipeline([sample_pr], config))
+        results1 = list(run_pipeline(_OFFLINE_STEPS, [sample_pr]))
+        results2 = list(run_pipeline(_OFFLINE_STEPS, [sample_pr]))
 
         assert results1[0].id == results2[0].id
         assert results1[0].char_count == results2[0].char_count
@@ -283,15 +208,13 @@ class TestRunPipelineEdgeCases:
 
     def test_empty_source(self):
         """Testa pipeline com source vazio."""
-        config = PipelineConfig(enable_classification=False)
-        results = list(run_pipeline([], config))
+        results = list(run_pipeline(_OFFLINE_STEPS, []))
 
         assert len(results) == 0
 
     def test_single_record(self, sample_pr):
         """Testa pipeline com único registro."""
-        config = PipelineConfig(enable_classification=False)
-        results = list(run_pipeline([sample_pr], config))
+        results = list(run_pipeline(_OFFLINE_STEPS, [sample_pr]))
 
         assert len(results) == 1
 
@@ -302,7 +225,6 @@ class TestRunPipelineEdgeCases:
             for pr in sample_pr_list:
                 yield pr
 
-        config = PipelineConfig(enable_classification=False)
-        results = list(run_pipeline(pr_generator(), config))
+        results = list(run_pipeline(_OFFLINE_STEPS, pr_generator()))
 
         assert len(results) == len(sample_pr_list)

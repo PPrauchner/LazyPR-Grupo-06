@@ -19,7 +19,12 @@ from unittest.mock import patch
 import pytest
 
 from core.models.pr_record import PRRecord
-from core.pipeline.runner import PipelineConfig, run_pipeline
+from core.pipeline.runner import run_pipeline
+from core.pipeline.stages import (
+    enrich_without_classification,
+    filter_results,
+    normalize_records,
+)
 from core.transforms.filtering import by_language
 from services import storage
 
@@ -58,12 +63,9 @@ def dataset() -> tuple[PRRecord, ...]:
     )
 
 
-# A classificação fica desabilitada para manter o teste offline; a filtragem
-# era aplicada independentemente dela, então o defeito se reproduz igual.
-_UPLOAD_CONFIG = PipelineConfig(
-    enable_normalization=True,
-    enable_classification=False,
-)
+# A classificação fica de fora para manter o teste offline; a filtragem era
+# aplicada independentemente dela, então o defeito se reproduz igual.
+_UPLOAD_STEPS = (normalize_records, enrich_without_classification)
 
 
 @patch("ui.sidebar_filters.st")
@@ -85,7 +87,7 @@ def test_persisted_analysis_covers_full_dataset_despite_active_sidebar_filter(
         "use_date_filter": False,
     }
 
-    results = tuple(run_pipeline(dataset, _UPLOAD_CONFIG))
+    results = tuple(run_pipeline(_UPLOAD_STEPS, dataset))
     storage.save_results("dataset_hash", results)
 
     loaded = tuple(storage.load_results("dataset_hash"))
@@ -95,11 +97,9 @@ def test_persisted_analysis_covers_full_dataset_despite_active_sidebar_filter(
 
 def test_pipeline_filters_when_predicates_arrive_by_argument(dataset):
     """Filtragem continua sendo etapa utilizável — via argumento, não estado."""
-    config = _UPLOAD_CONFIG._replace(
-        filter_predicates=(by_language(("python",)),),
-    )
+    steps = _UPLOAD_STEPS + (filter_results((by_language(("python",)),)),)
 
-    results = tuple(run_pipeline(dataset, config))
+    results = tuple(run_pipeline(steps, dataset))
 
     assert tuple(record.id for record in results) == (1,)
 
