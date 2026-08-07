@@ -13,6 +13,7 @@ from ui.sidebar_filters import (
     PR_NATURES,
     PR_NATURE_LABELS,
     PAGES,
+    PAGE_LABELS,
 )
 from core.models.analysis_result import AnalysisResult
 from services.ingestion import _EXTENSION_TO_LANGUAGE
@@ -94,6 +95,7 @@ def test_languages_vocabulary_matches_extension_map():
         (PR_NATURES, PR_NATURE_LABELS),
         (CLARITY_LEVELS, CLARITY_LEVEL_LABELS),
         (LANGUAGES, LANGUAGE_LABELS),
+        (PAGES, PAGE_LABELS),
     ),
 )
 def test_every_canonical_value_has_a_display_label(vocabulary, labels):
@@ -111,9 +113,32 @@ def test_label_formatter_keeps_canonical_value_when_label_is_missing():
 
 
 def test_pages_vocabulary_not_empty():
-    """Verifica que a lista de páginas não está vazia."""
+    """Verifica que a lista de páginas não está vazia.
+
+    `PAGES` guarda chaves estáveis de roteamento, não rótulos: o texto
+    visível sai de `PAGE_LABELS`, via `format_func`.
+    """
     assert len(PAGES) > 0, "PAGES deve conter pelo menos uma página."
-    assert "Upload" in PAGES, "Upload deveria estar na lista de PAGES."
+    assert "upload" in PAGES, "upload deveria estar na lista de PAGES."
+
+
+def test_pages_are_stable_keys_not_visible_labels():
+    """Nenhuma rota carrega texto de tela: trocar um rótulo não muda a rota.
+
+    Chave estável é identificador ASCII em minúsculas — sem emoji, sem
+    espaço, sem acento. É o que garante que traduzir a interface não quebre
+    a navegação.
+    """
+    unstable = tuple(page for page in PAGES if not page.isascii() or not page.islower())
+    assert unstable == (), f"Rotas com texto visível como identificador: {unstable}"
+
+
+def test_page_label_formatter_translates_route_to_visible_text():
+    """O rótulo de tela é derivado da chave, e não o contrário."""
+    formatter = label_formatter(PAGE_LABELS)
+
+    assert formatter("upload") == "📂 Upload"
+    assert formatter("correlations") == "🔥 Correlação"
 
 
 @patch("ui.sidebar_filters.st")

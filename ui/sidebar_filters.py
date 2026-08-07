@@ -123,12 +123,29 @@ CLARITY_LEVEL_LABELS: Mapping[str, str] = MappingProxyType(
     }
 )
 
-PAGES = (
-    "🏠 Home",
-    "📂 Upload",
-    "📊 Overview",
-    "🔥 Correlação",
-    "💾 Exportação",
+# Chaves estáveis de roteamento: é por elas que `main.py` casa a página e é
+# isso que `page_override` grava na sessão. O rótulo visível vive só em
+# `PAGE_LABELS` — mudar o texto de um rótulo não pode mexer na navegação.
+PAGES: tuple[str, ...] = (
+    "home",
+    "upload",
+    "overview",
+    "correlations",
+    "export",
+)
+
+# Cobre também as páginas alcançáveis apenas por `page_override` (limpeza e
+# normalização), que não aparecem na navegação mas são rotas válidas.
+PAGE_LABELS: Mapping[str, str] = MappingProxyType(
+    {
+        "home": "🏠 Home",
+        "upload": "📂 Upload",
+        "overview": "📊 Overview",
+        "correlations": "🔥 Correlação",
+        "export": "💾 Exportação",
+        "cleaning": "🧹 Limpeza",
+        "normalization": "⚙️ Normalização",
+    }
 )
 
 
@@ -254,11 +271,12 @@ def render_sidebar() -> dict:
         render_section_title("NAVEGAÇÃO")
 
         if "page" not in st.session_state:
-            st.session_state["page_override"] = "🏠 Home"
+            st.session_state["page_override"] = "home"
 
         selected_page = st.radio(
             "Navegação",
             PAGES,
+            format_func=label_formatter(PAGE_LABELS),
             key="page",
             label_visibility="collapsed",
         )

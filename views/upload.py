@@ -12,10 +12,38 @@ from streamlit.runtime.uploaded_file_manager import UploadedFile
 
 from core.transforms.cleaning import get_missing_columns
 from services.ingestion import read_header_lazily, stream_csv
-from core.pipeline.runner import run_pipeline, PipelineConfig
+from core.pipeline.runner import run_pipeline
+from core.pipeline.stages import (
+    Stage,
+    clean_records,
+    enrich_without_classification,
+    normalize_records,
+)
+from services.classifiers import classify_project_type
 from services.storage import has_cached_analysis, load_results, save_results
 from utils.hashing import hash_file_stream
 from ui.components import status_banner
+
+# Etapas oferecidas ao usuário, na ordem em que compõem o pipeline.
+# Cada entrada: (rótulo, ajuda, Etapa).
+_SELECTABLE_STAGES: tuple[tuple[str, str, Stage], ...] = (
+    (
+        "Limpeza textual",
+        "Remove HTML, espaços sobrando e trunca campos longos.",
+        clean_records,
+    ),
+    (
+        "Normalização",
+        "Converte a linguagem inferida para a forma canônica.",
+        normalize_records,
+    ),
+    (
+        "Classificação semântica (LLM)",
+        "Classifica tipo de projeto, natureza e clareza. Sem ela, as três "
+        "classificações ficam como 'unknown'.",
+        classify_project_type,
+    ),
+)
 
 
 def _validate_schema(uploaded_file: UploadedFile) -> bool:
@@ -33,6 +61,32 @@ def _validate_schema(uploaded_file: UploadedFile) -> bool:
         return False
 
     return True
+
+
+def _select_stages() -> tuple[Stage, ...]:
+    """Oferece as Etapas ao usuário e monta a tupla que será executada.
+
+    Uma Etapa desmarcada simplesmente não entra na tupla (Regra Geral 05).
+    Quando a Classificação Semântica fica de fora, o enriquecimento neutro
+    entra no lugar dela para que o resultado continue sendo `AnalysisResult`
+    e possa ser persistido e agregado como qualquer outra Análise.
+
+    Returns:
+        Etapas escolhidas, na ordem de aplicação.
+    """
+    st.markdown("**Etapas do pipeline**")
+
+    chosen = tuple(
+        stage
+        for label, help_text, stage in _SELECTABLE_STAGES
+        if st.checkbox(label, value=True, help=help_text, key=f"stage::{label}")
+    )
+
+    return (
+        chosen
+        if classify_project_type in chosen
+        else chosen + (enrich_without_classification,)
+    )
 
 
 def render_upload_page() -> None:
@@ -54,7 +108,7 @@ def render_upload_page() -> None:
 
             if st.button("📊 Ver Análise"):
 
-                st.session_state["page_override"] = "📊 Overview"
+                st.session_state["page_override"] = "overview"
                 st.rerun()
 
         with col2:
@@ -110,6 +164,8 @@ def render_upload_page() -> None:
     # Execução
     # ---------------------------------------------------------
 
+    steps = _select_stages()
+
     if st.button("Iniciar Análise 🚀"):
 
         uploaded_file.seek(0)
@@ -143,18 +199,13 @@ def render_upload_page() -> None:
 
             source_stream = stream_csv(uploaded_file)
 
-            config = PipelineConfig(
-                enable_normalization=True,
-                enable_classification=True,
-            )
-
             # A recusa de schema não interrompe a Análise: o llm_client degrada
             # o registro recusado para o sentinela `unknown` e registra a
             # recusa em log, para que os demais registros cheguem ao fim e
             # sejam persistidos (ADR-0004).
             resultados_lazy = run_pipeline(
+                steps,
                 source_stream,
-                config,
             )
 
             resultados_finais = tuple(resultados_lazy)

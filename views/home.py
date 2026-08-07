@@ -190,7 +190,7 @@ def render_home(records) -> None:
             width="stretch",
         ):
 
-            st.session_state["page_override"] = "📂 Upload"
+            st.session_state["page_override"] = "upload"
             st.rerun()
 
         st.markdown(
@@ -218,7 +218,7 @@ def render_home(records) -> None:
             width="stretch",
         ):
 
-            st.session_state["page_override"] = "🧹 Limpeza"
+            st.session_state["page_override"] = "cleaning"
             st.rerun()
 
         st.markdown(
@@ -246,7 +246,7 @@ def render_home(records) -> None:
             width="stretch",
         ):
 
-            st.session_state["page_override"] = "⚙️ Normalização"
+            st.session_state["page_override"] = "normalization"
             st.rerun()
 
         st.markdown(
@@ -274,7 +274,7 @@ def render_home(records) -> None:
             width="stretch",
         ):
 
-            st.session_state["page_override"] = "📊 Overview"
+            st.session_state["page_override"] = "overview"
             st.rerun()
 
         st.markdown(
@@ -302,7 +302,7 @@ def render_home(records) -> None:
             width="stretch",
         ):
 
-            st.session_state["page_override"] = "🔥 Correlação"
+            st.session_state["page_override"] = "correlations"
             st.rerun()
 
         st.markdown(
@@ -329,7 +329,7 @@ def render_home(records) -> None:
             key="quick_upload",
         ):
 
-            st.session_state["page_override"] = "📂 Upload"
+            st.session_state["page_override"] = "upload"
             st.rerun()
 
     with quick_col2:
@@ -340,7 +340,7 @@ def render_home(records) -> None:
             key="quick_overview",
         ):
 
-            st.session_state["page_override"] = "📊 Overview"
+            st.session_state["page_override"] = "overview"
             st.rerun()
 
     with quick_col3:
@@ -351,7 +351,7 @@ def render_home(records) -> None:
             key="quick_correlation",
         ):
 
-            st.session_state["page_override"] = "🔥 Correlação"
+            st.session_state["page_override"] = "correlations"
             st.rerun()
 
     st.divider()
