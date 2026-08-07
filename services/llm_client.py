@@ -87,6 +87,12 @@ _THROTTLE_SECONDS: float = 2.1
 
 _DEFAULT_MODEL = "llama-3.1-8b-instant"
 
+# Truncamento do `diff_hunk` que acompanha o comentário na avaliação de clareza.
+# Constante fixa, e não variável de ambiente: o truncamento já tem duas fontes de
+# verdade neste projeto (§15.6 do CLAUDE.md) e uma terceira pioraria. O valor
+# segura o custo de token dentro dos 30 RPM do plano gratuito (ADR-0002).
+_MAX_DIFF_HUNK_CHARS: int = 500
+
 # ---------------------------------------------------------------------------
 # Schemas de saída — vivem em services/ para que core/ não ganhe nenhum
 # import novo (Regra Geral 06 / Regra Específica 02).
@@ -101,18 +107,6 @@ class ProjectTypeOutput(BaseModel):
     """Saída estruturada da classificação de tipo de projeto."""
 
     project_type: ProjectTypeValue
-
-
-class PRNatureOutput(BaseModel):
-    """Saída estruturada da classificação de natureza da contribuição."""
-
-    pr_nature: PRNatureValue
-
-
-class ClarityOutput(BaseModel):
-    """Saída estruturada da avaliação de clareza da descrição."""
-
-    clarity_level: ClarityLevelValue
 
 
 class PRNatureAndClarityOutput(BaseModel):
@@ -131,8 +125,6 @@ class PRNatureAndClarityOutput(BaseModel):
 # tudo o que já foi pago em cota do Groq (ADR-0004). A recusa fica registrada
 # em log, com repositório e conteúdo.
 _DEGRADED_PROJECT_TYPE_JSON: str = json.dumps({"project_type": UNKNOWN_PROJECT_TYPE})
-_DEGRADED_PR_NATURE_JSON: str = json.dumps({"pr_nature": UNKNOWN_PR_NATURE})
-_DEGRADED_CLARITY_JSON: str = json.dumps({"clarity_level": UNKNOWN_CLARITY_LEVEL})
 _DEGRADED_NATURE_AND_CLARITY_JSON: str = json.dumps(
     {"pr_nature": UNKNOWN_PR_NATURE, "clarity_level": UNKNOWN_CLARITY_LEVEL}
 )
@@ -494,94 +486,18 @@ def classify_project_type_batch(records: tuple[PRRecord, ...]) -> str:
     )
 
 
-def classify_pr_nature_single(record: PRRecord) -> str:
-    """
-    Classifica a natureza de um PR individual baseada no corpo da descrição.
-
-    Envia um único PR ao LLM com prompt específico para inferir sua natureza:
-    bug_fix, feature, refactoring, documentation ou other.
-
-    Memoizado: mesma entrada (record) → mesma saída (cached).
-
-    Args:
-        record: PRRecord a classificar.
-
-    Returns:
-        String JSON bruta retornada pelo LLM,
-        ex: '{"pr_nature": "feature"}'.
-
-    Raises:
-        ValueError: Se a API key não estiver definida ou LLM falhar.
-    """
-    if not record.body or not record.body.strip():
-        return '{"pr_nature": "other"}'
-
-    prompt = (
-        "You are an AI assistant classifying the nature of a GitHub Pull Request.\n"
-        "Analyze the PR description and determine its nature.\n"
-        "Valid values for 'pr_nature': 'bug_fix', 'feature', 'refactoring', 'documentation', 'other'.\n"
-        f"\nRepository: {record.repo}\n"
-        f"Path: {record.path[:100]}\n"
-        f"PR Description: {record.body[:1000]}\n"
-    )
-
-    api_key = os.getenv("GROQ_API_KEY")
-    model = _DEFAULT_MODEL
-    logger.debug(f"Usando modelo LLM: {model} para classify_pr_nature_single")
-
-    agent = _build_agent(api_key, model, PRNatureOutput)
-    response = _invoke_with_retry(agent=agent, prompt=prompt, repo=record.repo)
-    return (
-        response.model_dump_json() if response is not None else _DEGRADED_PR_NATURE_JSON
-    )
-
-
-def classify_clarity_single(record: PRRecord) -> str:
-    """
-    Classifica o nível de clareza da descrição de um PR individual.
-
-    Envia um único PR ao LLM com prompt específico para avaliar se a
-    descrição é insufficient, basic, good ou excellent.
-
-    Args:
-        record: PRRecord a classificar.
-
-    Returns:
-        String JSON bruta retornada pelo LLM,
-        ex: '{"clarity_level": "good"}'.
-
-    Raises:
-        ValueError: Se a API key não estiver definida ou LLM falhar.
-    """
-    if not record.body or not record.body.strip():
-        return '{"clarity_level": "insufficient"}'
-
-    prompt = (
-        "You are an AI assistant evaluating the clarity of GitHub Pull Request descriptions.\n"
-        "Assess the PR description and determine its clarity level.\n"
-        "Valid values for 'clarity_level': 'insufficient', 'basic', 'good', 'excellent'.\n"
-        "Consider: presence of context, problem statement, solution explanation, and examples.\n"
-        f"\nRepository: {record.repo}\n"
-        f"PR Description: {record.body[:1000]}\n"
-    )
-
-    api_key = os.getenv("GROQ_API_KEY")
-    model = _DEFAULT_MODEL
-    logger.debug(f"Usando modelo LLM: {model} para classify_clarity_single")
-
-    agent = _build_agent(api_key, model, ClarityOutput)
-    response = _invoke_with_retry(agent=agent, prompt=prompt, repo=record.repo)
-    return (
-        response.model_dump_json() if response is not None else _DEGRADED_CLARITY_JSON
-    )
-
-
 def classify_pr_nature_and_clarity_single(record: PRRecord) -> str:
     """Classifica natureza e clareza de um PR em uma única chamada LLM.
 
-    Substitui as duas chamadas separadas (classify_pr_nature_single +
-    classify_clarity_single) por uma única requisição, reduzindo o consumo
-    de RPM à metade para classificações por PR.
+    Uma requisição só cobre as duas classificações, reduzindo o consumo de RPM
+    à metade nas classificações por PR.
+
+    O prompt descreve o dado real — um Comentário de Revisão sobre uma linha,
+    julgado ao lado do `diff_hunk` a que se refere — e não uma descrição de Pull
+    Request, que o dataset não traz. A rubrica de clareza mede acionabilidade e
+    não pune concisão: um comentário curto e certeiro é a virtude que se espera
+    dele, não um defeito (ADR-0002). A interface segue dizendo "PR"; só o que o
+    modelo recebe mudou.
 
     Args:
         record: PRRecord a classificar.
@@ -597,13 +513,29 @@ def classify_pr_nature_and_clarity_single(record: PRRecord) -> str:
         return '{"pr_nature": "other", "clarity_level": "insufficient"}'
 
     prompt = (
-        "You are an AI assistant classifying a GitHub Pull Request.\n"
-        "Analyze the PR description and classify both its nature and its clarity.\n"
-        "Valid values for 'pr_nature': 'bug_fix', 'feature', 'refactoring', 'documentation', 'other'.\n"
+        "You are evaluating the clarity of a code review comment left on a\n"
+        "specific line of a file in a GitHub repository. You receive the comment\n"
+        "and the diff hunk it refers to.\n"
+        "\n"
+        "A good review comment is specific, actionable and justified. Brevity is\n"
+        "NOT a defect: a short, precise remark is excellent. Do not expect\n"
+        "problem statements, examples or general context - those belong to pull\n"
+        "request descriptions, not to review comments.\n"
+        "\n"
         "Valid values for 'clarity_level': 'insufficient', 'basic', 'good', 'excellent'.\n"
+        "'insufficient': vague or contentless ('lgtm', '?', 'fix this').\n"
+        "'basic': points at something in the hunk but neither says what to do\n"
+        "         nor why.\n"
+        "'good': specific and actionable - the author knows what to change.\n"
+        "'excellent': specific, actionable AND justified, or carries a concrete\n"
+        "             suggestion.\n"
+        "\n"
+        "Also classify the nature of the change being commented on.\n"
+        "Valid values for 'pr_nature': 'bug_fix', 'feature', 'refactoring', 'documentation', 'other'.\n"
         f"\nRepository: {record.repo}\n"
         f"Path: {record.path[:100]}\n"
-        f"PR Description: {record.body[:1000]}\n"
+        f"Diff hunk: {record.diff_hunk[:_MAX_DIFF_HUNK_CHARS]}\n"
+        f"Review comment: {record.body[:1000]}\n"
     )
 
     api_key = os.getenv("GROQ_API_KEY")

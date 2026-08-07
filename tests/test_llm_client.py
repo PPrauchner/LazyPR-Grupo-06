@@ -340,6 +340,110 @@ def test_project_type_batch_sends_one_prompt_for_the_whole_repository(
 
 
 # ---------------------------------------------------------------------------
+# O prompt descreve o dado real: um Comentário de Revisão (issue #85, ADR-0002)
+# ---------------------------------------------------------------------------
+
+
+def test_prompt_never_calls_the_content_a_pr_description(
+    sample_pr, use_fake_agent, recorded_sleeps
+):
+    """Nenhum prompt rotula o conteúdo enviado como descrição de PR."""
+    agent = use_fake_agent(
+        FakeAgent(FakeClassification(pr_nature="bug_fix", clarity_level="good"))
+    )
+
+    llm_client.classify_pr_nature_and_clarity_single(sample_pr)
+
+    assert "pr description" not in agent.prompts[0].lower()
+
+
+def test_prompt_labels_the_body_as_a_review_comment(
+    sample_pr, use_fake_agent, recorded_sleeps
+):
+    """O corpo enviado é apresentado ao modelo como comentário de revisão."""
+    agent = use_fake_agent(
+        FakeAgent(FakeClassification(pr_nature="bug_fix", clarity_level="good"))
+    )
+
+    llm_client.classify_pr_nature_and_clarity_single(sample_pr)
+
+    assert "Review comment:" in agent.prompts[0]
+    assert sample_pr.body in agent.prompts[0]
+
+
+def test_clarity_rubric_does_not_punish_brevity(
+    sample_pr, use_fake_agent, recorded_sleeps
+):
+    """A rubrica diz explicitamente que concisão não é defeito."""
+    agent = use_fake_agent(
+        FakeAgent(FakeClassification(pr_nature="bug_fix", clarity_level="good"))
+    )
+
+    llm_client.classify_pr_nature_and_clarity_single(sample_pr)
+
+    prompt = agent.prompts[0].lower()
+    assert "brevity is" in prompt and "not a defect" in prompt
+    # As âncoras por nível substituem a rubrica de descrição de PR.
+    assert all(
+        level in prompt for level in ("insufficient", "basic", "good", "excellent")
+    )
+
+
+def test_diff_hunk_accompanies_the_body(sample_pr, use_fake_agent, recorded_sleeps):
+    """O hunk comentado entra no prompt: sem ele o comentário é injulgável."""
+    agent = use_fake_agent(
+        FakeAgent(FakeClassification(pr_nature="bug_fix", clarity_level="good"))
+    )
+
+    llm_client.classify_pr_nature_and_clarity_single(sample_pr)
+
+    assert "Diff hunk:" in agent.prompts[0]
+    assert sample_pr.diff_hunk in agent.prompts[0]
+
+
+def test_diff_hunk_is_truncated(sample_pr, use_fake_agent, recorded_sleeps):
+    """O hunk é truncado para segurar o custo de token a 30 RPM."""
+    agent = use_fake_agent(
+        FakeAgent(FakeClassification(pr_nature="bug_fix", clarity_level="good"))
+    )
+    long_hunk = "@" * 5_000
+
+    llm_client.classify_pr_nature_and_clarity_single(
+        sample_pr._replace(diff_hunk=long_hunk)
+    )
+
+    assert long_hunk not in agent.prompts[0]
+    assert "@" * llm_client._MAX_DIFF_HUNK_CHARS in agent.prompts[0]
+
+
+def test_pr_nature_vocabulary_is_unchanged(sample_pr, use_fake_agent, recorded_sleeps):
+    """A parte de natureza sobrevive com o vocabulário controlado intacto."""
+    agent = use_fake_agent(
+        FakeAgent(FakeClassification(pr_nature="bug_fix", clarity_level="good"))
+    )
+
+    llm_client.classify_pr_nature_and_clarity_single(sample_pr)
+
+    assert all(
+        value in agent.prompts[0]
+        for value in ("bug_fix", "feature", "refactoring", "documentation", "other")
+    )
+
+
+def test_project_type_prompt_still_evaluates_the_repository(
+    sample_pr, use_fake_agent, recorded_sleeps
+):
+    """O prompt de Tipo de Projeto não muda de sujeito: avalia o repositório."""
+    agent = use_fake_agent(FakeAgent(FakeClassification(project_type="library")))
+
+    llm_client.classify_project_type_batch((sample_pr,))
+
+    prompt = agent.prompts[0]
+    assert f"Repository: {sample_pr.repo}" in prompt
+    assert "project type of the repository" in prompt.lower()
+
+
+# ---------------------------------------------------------------------------
 # Atalhos sem chamada ao LLM
 # ---------------------------------------------------------------------------
 

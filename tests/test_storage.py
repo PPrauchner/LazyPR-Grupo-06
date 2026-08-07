@@ -483,5 +483,106 @@ class TestCacheNamespaces:
             ).exists()
 
 
+class TestPromptVersionInvalidatesBothNamespaces:
+    """A versão de prompt é a segunda dimensão do nome de arquivo do cache.
+
+    Versão de esquema (formato de armazenamento) e versão de prompt (rubrica)
+    são independentes: bumpar uma não pode mexer no que a outra invalida.
+    Mudar a rubrica contamina os dois espaços de nomes, porque o
+    `clarity_level` produzido por ela mora nos dois (issue #85).
+    """
+
+    def _result(self, result_id: int = 1) -> AnalysisResult:
+        """Constrói um AnalysisResult mínimo para os testes de versão."""
+        return AnalysisResult(
+            id=result_id,
+            html_url="https://github.com/repo/test/pull/10#comment-1",
+            repo="repo/test",
+            path="src/main.py",
+            body="Body",
+            diff_hunk="@@ -10,5 +10,5 @@",
+            author="author",
+            author_association="CONTRIBUTOR",
+            commit_id="abc123",
+            line=10,
+            language="Python",
+            created_at="2024-01-01",
+            project_type="library",
+            pr_nature="feature",
+            clarity_level="good",
+            char_count=4,
+            word_count=1,
+        )
+
+    def test_cache_file_name_carries_both_versions(self, temp_cache_dir):
+        """O nome do arquivo traz versão de esquema e versão de prompt."""
+        from services.prompt_version import PROMPT_VERSION
+
+        for namespace in (
+            storage.ANALYSIS_NAMESPACE,
+            storage.REPO_CLASSIFICATION_NAMESPACE,
+        ):
+            name = storage._cache_path("abc", namespace=namespace).name
+            assert name == (
+                f"{storage._schema_version(namespace)}-{PROMPT_VERSION}-abc.json"
+            )
+
+    def test_prompt_version_bump_invalidates_both_namespaces(
+        self, temp_cache_dir, monkeypatch
+    ):
+        """Trocar a versão de prompt derruba a Análise e as classificações."""
+        shared_hash = "hash_compartilhado"
+        storage.save_results(shared_hash, [self._result()])
+        storage.save_results(
+            shared_hash,
+            [self._result(2)],
+            namespace=storage.REPO_CLASSIFICATION_NAMESPACE,
+        )
+
+        monkeypatch.setattr(storage, "PROMPT_VERSION", "p99")
+
+        assert not storage.has_cached_analysis(shared_hash)
+        assert not storage.has_cached_analysis(
+            shared_hash, namespace=storage.REPO_CLASSIFICATION_NAMESPACE
+        )
+
+    def test_schema_version_bump_does_not_move_the_prompt_dimension(
+        self, temp_cache_dir, monkeypatch
+    ):
+        """As duas dimensões são independentes: uma não arrasta a outra."""
+        monkeypatch.setattr(storage, "CACHE_SCHEMA_VERSION", "v99")
+        monkeypatch.setattr(storage, "PROMPT_VERSION", "p7")
+
+        assert (
+            storage._cache_path("abc", namespace=storage.ANALYSIS_NAMESPACE).name
+            == "v99-p7-abc.json"
+        )
+        assert (
+            storage._cache_path(
+                "abc", namespace=storage.REPO_CLASSIFICATION_NAMESPACE
+            ).name
+            == f"{storage.REPO_CLASSIFICATION_SCHEMA_VERSION}-p7-abc.json"
+        )
+
+    def test_prompt_version_module_imports_nothing(self):
+        """`prompt_version` é neutro: não importa nada, logo não exige Agno.
+
+        Se ele importasse `llm_client` — que levanta `ImportError` sem o Agno —
+        todo teste de storage passaria a depender da biblioteca de LLM.
+        """
+        import ast
+        import inspect
+
+        from services import prompt_version
+
+        tree = ast.parse(inspect.getsource(prompt_version))
+        imports = [
+            node
+            for node in ast.walk(tree)
+            if isinstance(node, (ast.Import, ast.ImportFrom))
+        ]
+        assert imports == []
+
+
 if __name__ == "__main__":
     pytest.main([__file__, "-v"])

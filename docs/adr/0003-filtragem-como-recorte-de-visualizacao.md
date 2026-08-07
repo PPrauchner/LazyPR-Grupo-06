@@ -71,3 +71,22 @@ A escrita permanece atômica (`.tmp` + `os.replace`) nos dois espaços, agora co
 o `mkdir` do subdiretório do namespace. A mudança de layout invalida uma vez os
 arquivos que estavam na raiz de `CACHE_DIR`; daí em diante, cada espaço evolui
 sozinho.
+
+### Segunda dimensão da chave: a versão de prompt (issue #85)
+
+A versão de esquema responde por **como** o resultado é armazenado. Ela não
+responde por **qual rubrica** o produziu — e é isso que a [ADR-0002](./0002-clareza-avaliada-sobre-o-comentario-de-revisao.md)
+precisa invalidar ao corrigir os prompts. Por isso o nome do arquivo passa a
+carregar duas versões independentes:
+
+```
+.cache/analysis/v2-p1-<hash>.json
+.cache/repo-classification/v1-p1-<hash>.json
+```
+
+A `PROMPT_VERSION` vive em `services/prompt_version.py` — módulo sem nenhum
+import, para que `storage.py` possa lê-la sem arrastar a dependência de Agno que
+`llm_client.py` exige. Ao contrário da versão de esquema, ela compõe a chave dos
+**dois** espaços de nomes: a rubrica produz o `clarity_level`, que mora tanto na
+Análise quanto nas classificações por repositório. Bumpar uma dimensão não mexe
+no que a outra invalida.
